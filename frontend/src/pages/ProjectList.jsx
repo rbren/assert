@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { api } from '../api'
 import { SectionHead, StandingAxis } from '../components.jsx'
+import { projectPath } from '../urls.js'
 
 export default function ProjectList() {
   const [projects, setProjects] = useState(null)
@@ -28,7 +29,7 @@ export default function ProjectList() {
     setError('')
     try {
       const p = await api.createProject(url.trim())
-      navigate(`/projects/${p.id}`)
+      navigate(projectPath(p))
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -83,7 +84,7 @@ export default function ProjectList() {
           </p>
         ) : (
           projects.map((p) => (
-            <Link key={p.id} to={`/projects/${p.id}`} className="project-row">
+            <Link key={p.id} to={projectPath(p)} className="project-row">
               <div>
                 <div className="project-name">{p.name}</div>
                 <div className="project-meta">

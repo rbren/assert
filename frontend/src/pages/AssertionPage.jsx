@@ -16,6 +16,7 @@ import {
   statusOf,
 } from '../components.jsx'
 import { freshness, parseUTC, timeAgo } from '../freshness'
+import { assertionPath, assertionSlug, findAssertion, findProject, projectPath } from '../urls.js'
 
 const POLL_MS = 4000
 
@@ -108,8 +109,9 @@ function InlineField({ value, onCommit, className, maxLength, ariaLabel, placeho
 }
 
 export default function AssertionPage() {
-  const { assertionId } = useParams()
+  const { org, repo, slug } = useParams()
   const canvas = useCanvasUrl()
+  const [project, setProject] = useState(null)
   const [assertion, setAssertion] = useState(null)
   const [runs, setRuns] = useState([])
   const [attempts, setAttempts] = useState([])
@@ -120,18 +122,28 @@ export default function AssertionPage() {
 
   const load = useCallback(async () => {
     try {
+      const projects = await api.listProjects()
+      const summary = findProject(projects, org, repo)
+      if (!summary) throw new Error('Project not found')
+      const detail = await api.getProject(summary.id)
+      const matched = findAssertion(detail.assertions, slug)
+      if (!matched) throw new Error('Assertion not found')
+      if (assertionSlug(matched) !== slug) {
+        navigate(assertionPath(detail, matched), { replace: true })
+      }
       const [a, r, m] = await Promise.all([
-        api.getAssertion(assertionId),
-        api.listRuns(assertionId),
-        api.listRemediations(assertionId),
+        api.getAssertion(matched.id),
+        api.listRuns(matched.id),
+        api.listRemediations(matched.id),
       ])
+      setProject(detail)
       setAssertion(a)
       setRuns(r)
       setAttempts(m)
     } catch (e) {
       setError(e.message)
     }
-  }, [assertionId])
+  }, [org, repo, slug])
 
   useEffect(() => {
     load()
@@ -149,12 +161,13 @@ export default function AssertionPage() {
     return () => clearTimeout(timer.current)
   }, [assertion, load])
 
-  async function act(fn) {
+  async function act(fn, onSuccess) {
     setBusy(true)
     setError('')
     try {
-      await fn()
-      await load()
+      const result = await fn()
+      if (onSuccess) onSuccess(result)
+      else await load()
     } catch (e) {
       setError(e.message)
     } finally {
@@ -164,12 +177,11 @@ export default function AssertionPage() {
 
   async function remove() {
     if (!confirm('Delete this claim and everything the agent found?')) return
-    const projectId = assertion.project_id
-    await api.deleteAssertion(assertionId)
-    navigate(`/projects/${projectId}`)
+    await api.deleteAssertion(assertion.id)
+    navigate(projectPath(project))
   }
 
-  if (!assertion) return <p className="empty">{error || 'Loading…'}</p>
+  if (!assertion || !project) return <p className="empty">{error || 'Loading…'}</p>
 
   const run = assertion.latest_run
   const status = statusOf(assertion)
@@ -183,7 +195,7 @@ export default function AssertionPage() {
   return (
     <>
       <section className="claim-head">
-        <Link to={`/projects/${assertion.project_id}`} className="crumb">
+        <Link to={projectPath(project)} className="crumb">
           ← back to the repository
         </Link>
 
@@ -193,7 +205,7 @@ export default function AssertionPage() {
             className="emoji-field"
             maxLength={8}
             ariaLabel="Emoji"
-            onCommit={(emoji) => act(() => api.updateAssertion(assertionId, { emoji }))}
+            onCommit={(emoji) => act(() => api.updateAssertion(assertion.id, { emoji }))}
           />
           <InlineField
             value={assertion.title}
@@ -201,14 +213,19 @@ export default function AssertionPage() {
             maxLength={80}
             ariaLabel="Title"
             placeholder="Untitled claim"
-            onCommit={(title) => act(() => api.updateAssertion(assertionId, { title }))}
+            onCommit={(title) =>
+              act(() => api.updateAssertion(assertion.id, { title }), (updated) => {
+                setAssertion(updated)
+                navigate(assertionPath(project, updated), { replace: true })
+              })
+            }
           />
         </div>
 
         <ClaimEditor
           value={assertion.text}
           busy={busy}
-          onCommit={(text) => act(() => api.updateAssertion(assertionId, { text }))}
+          onCommit={(text) => act(() => api.updateAssertion(assertion.id, { text }))}
         />
 
         {assertion.raw_text !== assertion.text && (
@@ -221,7 +238,7 @@ export default function AssertionPage() {
             value={assertion.category}
             aria-label="Category"
             onChange={(e) =>
-              act(() => api.updateAssertion(assertionId, { category: e.target.value }))
+              act(() => api.updateAssertion(assertion.id, { category: e.target.value }))
             }
           >
             {CATEGORIES.map((c) => (
@@ -235,7 +252,7 @@ export default function AssertionPage() {
             value={assertion.priority}
             aria-label="Priority"
             onChange={(e) =>
-              act(() => api.updateAssertion(assertionId, { priority: e.target.value }))
+              act(() => api.updateAssertion(assertion.id, { priority: e.target.value }))
             }
           >
             {PRIORITIES.map((p) => (
@@ -253,7 +270,7 @@ export default function AssertionPage() {
             <button
               className="link recheck"
               disabled={busy || status === 'checking' || status === 'queued'}
-              onClick={() => act(() => api.reverify(assertionId))}
+              onClick={() => act(() => api.reverify(assertion.id))}
             >
               {status === 'checking' || status === 'queued'
                 ? 'checking…'
@@ -350,7 +367,7 @@ export default function AssertionPage() {
             <FixList
               fixes={run.fixes}
               busy={busy || fixing}
-              onApply={(fixId) => act(() => api.remediate(assertionId, fixId))}
+              onApply={(fixId) => act(() => api.remediate(assertion.id, fixId))}
             />
           )}
           {attempts.length > 0 && (

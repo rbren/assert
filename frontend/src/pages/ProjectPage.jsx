@@ -18,6 +18,7 @@ import {
   statusRank,
   tally,
 } from '../components.jsx'
+import { assertionPath, findProject } from '../urls.js'
 
 const POLL_MS = 4000
 
@@ -159,7 +160,7 @@ function ColumnHead({ col, sort, onSort, options, filter, onFilter, allLabel }) 
   )
 }
 
-function ClaimRow({ a, onRecheck, onFix, busy }) {
+function ClaimRow({ a, project, onRecheck, onFix, busy }) {
   const run = a.latest_run
   const status = statusOf(a)
   const canFix = run?.status === 'done' && run.verdict !== 'true' && run.fixes?.length > 0
@@ -170,7 +171,7 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
         {a.emoji}
       </div>
       <div>
-        <Link to={`/assertions/${a.id}`}>
+        <Link to={assertionPath(project, a)}>
           {a.title && <div className="claim-title">{a.title}</div>}
           <div className="claim-text">
             <Inline>{a.text}</Inline>
@@ -223,7 +224,7 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
 }
 
 export default function ProjectPage() {
-  const { projectId } = useParams()
+  const { org, repo } = useParams()
   const [project, setProject] = useState(null)
   const [text, setText] = useState('')
   const [priority, setPriority] = useState('medium')
@@ -237,8 +238,17 @@ export default function ProjectPage() {
   const timer = useRef(null)
 
   const load = useCallback(
-    () => api.getProject(projectId).then(setProject).catch((e) => setError(e.message)),
-    [projectId],
+    () =>
+      api
+        .listProjects()
+        .then((projects) => {
+          const found = findProject(projects, org, repo)
+          if (!found) throw new Error('Project not found')
+          return api.getProject(found.id)
+        })
+        .then(setProject)
+        .catch((e) => setError(e.message)),
+    [org, repo],
   )
 
   useEffect(() => {
@@ -285,7 +295,7 @@ export default function ProjectPage() {
     setBusy(true)
     setError('')
     try {
-      await api.createAssertion(projectId, text.trim(), priority)
+      await api.createAssertion(project.id, text.trim(), priority)
       setText('')
       await load()
     } catch (err) {
@@ -310,7 +320,7 @@ export default function ProjectPage() {
 
   async function remove() {
     if (!confirm(`Delete ${project.name} and every claim about it?`)) return
-    await api.deleteProject(projectId)
+    await api.deleteProject(project.id)
     navigate('/')
   }
 
@@ -332,7 +342,7 @@ export default function ProjectPage() {
             <button
               className="quiet"
               disabled={busy}
-              onClick={() => act(() => api.refreshProject(projectId))}
+              onClick={() => act(() => api.refreshProject(project.id))}
             >
               Pull latest commits
             </button>
@@ -489,6 +499,7 @@ export default function ProjectPage() {
               <ClaimRow
                 key={a.id}
                 a={a}
+                project={project}
                 busy={busy}
                 onRecheck={(id) => act(() => api.reverify(id))}
                 onFix={(id) => act(() => api.remediate(id))}

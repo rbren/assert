@@ -52,6 +52,10 @@ Both LLM paths go through the local agent-server at `127.0.0.1:18000`:
   header menu. There are no standalone filter/sort dropdowns — add a column,
   not a control. The pure sort/filter is `arrangeClaims` in `ProjectPage.jsx`,
   tested in `ProjectPage.test.js`.
+- In that header, sort is the column name plus an arrow, and filter is a
+  separate outlined button under it wearing a funnel and naming what the
+  column is filtered to ("filter" when it is not). A bare caret is not
+  allowed there: next to a sort arrow it reads as sort direction.
 - Exhibit stance (`for`/`against`) deliberately borrows no colour from the
   verdict ramp — it is told by its sign and weight, since an exhibit's side is
   not the run's verdict. Runs ingested before stances exist carry `""` and

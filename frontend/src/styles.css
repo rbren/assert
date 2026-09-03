@@ -787,32 +787,36 @@ details.suggestions button:hover:not(:disabled) {
 .ledger-head,
 .claim-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 128px 100px 124px 146px;
+  grid-template-columns: 30px minmax(0, 1fr) 132px 104px 128px 146px;
   gap: 18px;
 }
 .ledger-head {
-  align-items: center;
-  padding: 4px 0;
+  align-items: start;
+  padding: 4px 0 6px;
   border-bottom: 1px solid var(--rule);
 }
+/* Two lines: the column's name, which sorts, and under it a funnel that says
+   what the column is filtered to. Stacking them keeps a long filter value
+   from crowding the name out of a narrow column. */
 .col-head {
   position: relative;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
 }
-.col-head button {
+.col-sort {
   font-size: 10.5px;
   letter-spacing: 0.1em;
   color: var(--ink-3);
   border: 0;
-  padding: 5px 3px;
+  padding: 4px 3px;
 }
-.col-head button:hover:not(:disabled) {
+.col-sort:hover:not(:disabled) {
   background: transparent;
   color: var(--ink);
 }
-.col-head.sorted .col-sort,
-.col-head.filtered .col-filter {
+.col-head.sorted .col-sort {
   color: var(--ink);
 }
 .col-arrow {
@@ -823,6 +827,35 @@ details.suggestions button:hover:not(:disabled) {
 .col-head.sorted .col-arrow {
   color: var(--ink);
   opacity: 1;
+}
+/* The filter wears a funnel and its own outline, so it never reads as a
+   second sort arrow. */
+.col-filter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--ink-3);
+  border-color: var(--rule-soft);
+}
+.funnel {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+.col-filter-word {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.col-head.filtered .col-filter {
+  color: var(--ink);
+  border-color: var(--ink-3);
+  background: var(--raised);
 }
 .col-menu {
   position: absolute;
@@ -838,12 +871,19 @@ details.suggestions button:hover:not(:disabled) {
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
 }
 .col-menu button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
   color: var(--ink-2);
   text-align: left;
   text-transform: none;
   letter-spacing: 0.04em;
   font-size: 11px;
   padding: 6px 8px;
+  border: 0;
+}
+.col-menu-count {
+  color: var(--ink-3);
 }
 .col-menu button:hover:not(:disabled) {
   background: var(--sunk);
@@ -852,7 +892,7 @@ details.suggestions button:hover:not(:disabled) {
 .col-menu button.on {
   color: var(--ink);
 }
-.col-menu button.on::after {
+.col-menu button.on .col-menu-label::after {
   content: ' ✓';
   color: var(--ink-2);
 }

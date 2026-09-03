@@ -57,12 +57,23 @@ export function arrangeClaims(assertions, sort, filters) {
   })
 }
 
-/** A header cell: click the word to sort by it, the caret to filter on it. */
+/* A funnel, not a caret: a bare arrow in a table header reads as sort
+ * direction, which is the one thing this control is not. */
+function Funnel() {
+  return (
+    <svg className="funnel" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+      <path d="M0.5 1.5h13L8.4 7.6v4.6l-2.8 1.5V7.6z" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** A header cell: click the word to sort by it, the funnel to filter on it. */
 function ColumnHead({ col, sort, onSort, options, filter, onFilter, allLabel }) {
   const [open, setOpen] = useState(false)
   const box = useRef(null)
   const { label } = COLUMNS[col]
   const sorted = sort.col === col
+  const active = options?.find((o) => o.value === filter)
 
   useEffect(() => {
     if (!open) return
@@ -101,10 +112,20 @@ function ColumnHead({ col, sort, onSort, options, filter, onFilter, allLabel }) 
           <button
             className="col-filter"
             aria-expanded={open}
+            aria-label={
+              active
+                ? `${label} filtered to ${active.label} — change it`
+                : `Filter by ${label.toLowerCase()}`
+            }
             onClick={() => setOpen((v) => !v)}
-            title={`Filter by ${label.toLowerCase()}`}
+            title={
+              active
+                ? `Showing only ${active.label} — click to change`
+                : `Filter by ${label.toLowerCase()}`
+            }
           >
-            ▾
+            <Funnel />
+            <span className="col-filter-word">{active ? active.label : 'filter'}</span>
           </button>
           {open && (
             <div className="col-menu">
@@ -115,7 +136,7 @@ function ColumnHead({ col, sort, onSort, options, filter, onFilter, allLabel }) 
                   setOpen(false)
                 }}
               >
-                {allLabel}
+                <span className="col-menu-label">{allLabel}</span>
               </button>
               {options.map((o) => (
                 <button
@@ -126,7 +147,8 @@ function ColumnHead({ col, sort, onSort, options, filter, onFilter, allLabel }) 
                     setOpen(false)
                   }}
                 >
-                  {o.label}
+                  <span className="col-menu-label">{o.label}</span>
+                  {o.count != null && <span className="col-menu-count">{o.count}</span>}
                 </button>
               ))}
             </div>
@@ -454,7 +476,8 @@ export default function ProjectPage() {
               allLabel="Every status"
               options={ORDER.filter((k) => counts[k]).map((k) => ({
                 value: k,
-                label: `${STANDING[k].name.toLowerCase()} (${counts[k]})`,
+                label: STANDING[k].name.toLowerCase(),
+                count: counts[k],
               }))}
             />
             <span />

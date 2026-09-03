@@ -575,6 +575,7 @@ select:not(.chip-select):focus {
   border: 1px solid var(--rule);
   padding: 2px 7px;
   white-space: nowrap;
+  text-align: center;
 }
 /* Evidence age.
    The colour is confined to the pip. The chip's text stays neutral so that
@@ -1320,6 +1321,7 @@ details.diff pre {
   width: auto;
   cursor: pointer;
   appearance: none;
+  text-align: center;
 }
 .chip-select:hover {
   border-color: var(--ink-3);

@@ -2,6 +2,17 @@
 
 App that verifies assertions about a codebase. See `README.md` for the design.
 
+## ⚠️ Always deploy after making changes
+
+Every change MUST be deployed before you finish — the site serves only what
+is built/restarted on this host:
+
+1. Frontend edits: `cd frontend && npm run build` (nginx serves
+   `frontend/dist` directly; there is no dev server in production).
+2. Backend edits: `systemctl restart assert-backend`.
+3. Verify the site is serving (e.g. `curl -I` the site, or check
+   `journalctl -u assert-backend -f` for errors).
+
 ## Where things run on this host
 
 - Backend: `assert-backend.service` → `127.0.0.1:18400`

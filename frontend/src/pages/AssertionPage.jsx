@@ -3,16 +3,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api'
 import {
+  Attempt,
   CATEGORIES,
-  Category,
-  CommitRef,
+  Chip,
+  ExhibitList,
+  FixList,
   Freshness,
   Md,
   PRIORITIES,
-  Priority,
-  RemediationDetail,
-  RunDetail,
-  Verdict,
+  SectionHead,
+  STANDING,
+  Standing,
+  statusOf,
 } from '../components.jsx'
 
 const POLL_MS = 4000
@@ -34,8 +36,10 @@ function EditForm({ assertion, onSave, onCancel, busy }) {
         onSave({ text: text.trim(), title, emoji, category, priority })
       }}
     >
-      <div className="row">
+      <span className="label">Edit this claim</span>
+      <div className="row" style={{ marginTop: 12 }}>
         <input
+          type="text"
           className="emoji-input"
           value={emoji}
           maxLength={8}
@@ -43,9 +47,10 @@ function EditForm({ assertion, onSave, onCancel, busy }) {
           onChange={(e) => setEmoji(e.target.value)}
         />
         <input
+          type="text"
           value={title}
           maxLength={80}
-          placeholder="Two-word title"
+          placeholder="Short label"
           aria-label="Title"
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -59,25 +64,25 @@ function EditForm({ assertion, onSave, onCancel, busy }) {
         <select value={priority} onChange={(e) => setPriority(e.target.value)}>
           {PRIORITIES.map((p) => (
             <option key={p} value={p}>
-              {p}
+              {p} priority
             </option>
           ))}
         </select>
       </div>
       <textarea
-        rows={4}
+        rows={3}
         value={text}
-        aria-label="Assertion"
+        aria-label="Claim"
         onChange={(e) => setText(e.target.value)}
       />
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <span className="muted">
+      <div className="compose-foot">
+        <span className="mono muted">
           {textChanged
-            ? 'Changing the text starts a fresh investigation.'
-            : 'Markdown is supported.'}
+            ? 'Rewording the claim starts a fresh check.'
+            : 'Your words are kept exactly as written.'}
         </span>
         <div className="row">
-          <button type="button" onClick={onCancel} disabled={busy}>
+          <button type="button" className="quiet" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
           <button className="primary" disabled={busy || !text.trim()}>
@@ -93,7 +98,7 @@ export default function AssertionPage() {
   const { assertionId } = useParams()
   const [assertion, setAssertion] = useState(null)
   const [runs, setRuns] = useState([])
-  const [remediations, setRemediations] = useState([])
+  const [attempts, setAttempts] = useState([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -109,7 +114,7 @@ export default function AssertionPage() {
       ])
       setAssertion(a)
       setRuns(r)
-      setRemediations(m)
+      setAttempts(m)
     } catch (e) {
       setError(e.message)
     }
@@ -121,9 +126,10 @@ export default function AssertionPage() {
 
   useEffect(() => {
     if (!assertion) return
+    const status = statusOf(assertion)
     const pending =
-      !assertion.latest_run ||
-      assertion.latest_run.status === 'investigating' ||
+      status === 'checking' ||
+      status === 'queued' ||
       assertion.latest_remediation?.status === 'working'
     if (!pending) return
     timer.current = setTimeout(load, POLL_MS)
@@ -144,7 +150,7 @@ export default function AssertionPage() {
   }
 
   async function remove() {
-    if (!confirm('Delete this assertion?')) return
+    if (!confirm('Delete this claim and everything the agent found?')) return
     const projectId = assertion.project_id
     await api.deleteAssertion(assertionId)
     navigate(`/projects/${projectId}`)
@@ -153,110 +159,185 @@ export default function AssertionPage() {
   if (!assertion) return <p className="empty">{error || 'Loading…'}</p>
 
   const run = assertion.latest_run
+  const status = statusOf(assertion)
   const history = runs.filter((r) => r.id !== run?.id)
-  const latestRemediation = assertion.latest_remediation
+  const settled = run?.status === 'done'
+  const fixing = assertion.latest_remediation?.status === 'working'
 
   return (
     <>
-      <p className="muted">
-        <Link to={`/projects/${assertion.project_id}`}>← back to project</Link>
-      </p>
+      <section className="claim-head">
+        <Link to={`/projects/${assertion.project_id}`} className="crumb">
+          ← back to the repository
+        </Link>
 
-      {editing ? (
-        <EditForm
-          assertion={assertion}
-          busy={busy}
-          onCancel={() => setEditing(false)}
-          onSave={(patch) =>
-            act(async () => {
-              await api.updateAssertion(assertionId, patch)
-              setEditing(false)
-            })
-          }
-        />
-      ) : (
-        <>
-          <div
-            className="row"
-            style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
-          >
-            <h1 className="assertion-heading">
-              <span className="row-emoji">{assertion.emoji}</span>
-              {assertion.title || 'Assertion'}
-            </h1>
-            <Verdict run={run} />
-          </div>
-          <div className="row" style={{ gap: 8, marginTop: 4 }}>
-            <Category value={assertion.category} />
-            <Priority value={assertion.priority} />
-            <Freshness run={run} />
-            <CommitRef sha={run?.commit_sha} />
-            {run?.conversation_id && (
-              <a
-                className="mono"
-                href={`/conversations/${run.conversation_id}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                agent transcript ↗
-              </a>
+        {editing ? (
+          <EditForm
+            assertion={assertion}
+            busy={busy}
+            onCancel={() => setEditing(false)}
+            onSave={(patch) =>
+              act(async () => {
+                await api.updateAssertion(assertionId, patch)
+                setEditing(false)
+              })
+            }
+          />
+        ) : (
+          <>
+            <div className="row" style={{ gap: 14, alignItems: 'baseline' }}>
+              <span className="claim-emoji" aria-hidden="true">
+                {assertion.emoji}
+              </span>
+              <h1>{assertion.title || 'Claim'}</h1>
+            </div>
+            <div className="claim-statement">
+              <Md>{assertion.text}</Md>
+            </div>
+            {assertion.raw_text !== assertion.text && (
+              <p className="as-typed">As you typed it: “{assertion.raw_text}”</p>
             )}
-          </div>
+            <div className="row wrap-row" style={{ gap: 8, marginTop: 18 }}>
+              <Chip>{assertion.category}</Chip>
+              <Chip className={assertion.priority}>{assertion.priority} priority</Chip>
+              <Freshness run={run} />
+            </div>
+            <div className="row wrap-row" style={{ marginTop: 20 }}>
+              <button
+                className="quiet"
+                disabled={busy || status === 'checking'}
+                onClick={() => act(() => api.reverify(assertionId))}
+              >
+                Check again at head
+              </button>
+              <button className="quiet" disabled={busy} onClick={() => setEditing(true)}>
+                Edit
+              </button>
+              <button className="quiet danger" disabled={busy} onClick={remove}>
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+        {error && <div className="error">{error}</div>}
+      </section>
 
-          <Md className="assertion-body">{assertion.text}</Md>
-
-          {assertion.raw_text !== assertion.text && (
-            <p className="muted as-typed">As typed: “{assertion.raw_text}”</p>
+      <section className="verdict-panel">
+        <div>
+          {status === 'checking' && (
+            <p className="md">
+              An agent is reading the repository now. It looks for counterexamples
+              first, so a verdict takes a minute or two.
+            </p>
           )}
+          {status === 'queued' && (
+            <p className="md">This claim is waiting for an agent to pick it up.</p>
+          )}
+          {status === 'error' && (
+            <p className="md">
+              {run?.error || 'The run stopped before it reached a verdict.'} Nothing was
+              decided — check again to retry.
+            </p>
+          )}
+          {settled && <Md>{run.summary}</Md>}
+          {settled && run.caveats && (
+            <div className="caveats">
+              <div className="label">Caveats</div>
+              <Md className="small">{run.caveats}</Md>
+            </div>
+          )}
+        </div>
 
-          <div className="row" style={{ margin: '16px 0' }}>
-            <button
-              disabled={busy || run?.status === 'investigating'}
-              onClick={() => act(() => api.reverify(assertionId))}
-            >
-              Re-investigate at current HEAD
-            </button>
-            <button disabled={busy} onClick={() => setEditing(true)}>
-              Edit
-            </button>
-            <button className="danger" disabled={busy} onClick={remove}>
-              Delete
-            </button>
+        <aside className="verdict-aside">
+          <span className="label">Where it stands</span>
+          <div style={{ margin: '14px 0 10px' }}>
+            <Standing status={status} big />
           </div>
-        </>
+          <p className="mono muted" style={{ fontSize: 12, margin: 0 }}>
+            {STANDING[status].blurb}
+          </p>
+          <dl>
+            <dt>Commit</dt>
+            <dd>{run?.commit_sha ? run.commit_sha.slice(0, 12) : '—'}</dd>
+            <dt>Checked</dt>
+            <dd>
+              {run?.created_at ? new Date(run.created_at + 'Z').toLocaleString() : '—'}
+            </dd>
+            <dt>Exhibits</dt>
+            <dd>{run?.evidence?.length ?? 0}</dd>
+            {run?.conversation_id && (
+              <>
+                <dt>Agent</dt>
+                <dd>
+                  <a
+                    href={`/conversations/${run.conversation_id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}
+                  >
+                    read the transcript ↗
+                  </a>
+                </dd>
+              </>
+            )}
+          </dl>
+        </aside>
+      </section>
+
+      {settled && (
+        <section className="section">
+          <SectionHead
+            title="Exhibits"
+            note={
+              run.commit_sha
+                ? `gathered at ${run.commit_sha.slice(0, 10)} — reproduce them yourself`
+                : ''
+            }
+          />
+          <ExhibitList evidence={run.evidence} />
+        </section>
       )}
-      {error && <div className="error">{error}</div>}
 
-      <RunDetail
-        run={run}
-        applying={busy || latestRemediation?.status === 'working'}
-        onApplyFix={(fixId) => act(() => api.remediate(assertionId, fixId))}
-      />
+      {settled && run.fixes?.length > 0 && (
+        <section className="section">
+          <SectionHead
+            title="Ways to make it true"
+            note="an agent applies the one you pick, on its own branch"
+          />
+          <FixList
+            fixes={run.fixes}
+            busy={busy || fixing}
+            onApply={(fixId) => act(() => api.remediate(assertionId, fixId))}
+          />
+        </section>
+      )}
 
-      {remediations.map((r) => (
-        <RemediationDetail
-          key={r.id}
-          remediation={r}
-          onDiscard={(id) => act(() => api.discardRemediation(id))}
-        />
-      ))}
+      {attempts.length > 0 && (
+        <section className="section">
+          <SectionHead title="Fix attempts" />
+          {attempts.map((r) => (
+            <Attempt
+              key={r.id}
+              remediation={r}
+              onDiscard={(id) => act(() => api.discardRemediation(id))}
+            />
+          ))}
+        </section>
+      )}
 
       {history.length > 0 && (
-        <>
-          <h2>Earlier runs</h2>
+        <section className="section">
+          <SectionHead title="Earlier checks" note={`${history.length} before this one`} />
           {history.map((r) => (
-            <div key={r.id} className="card">
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <span className="muted">
-                  {new Date(r.created_at + 'Z').toLocaleString()}{' '}
-                  <CommitRef sha={r.commit_sha} />
-                </span>
-                <Verdict run={r} />
-              </div>
-              <Md className="muted">{r.summary}</Md>
+            <div key={r.id} className="history-row">
+              <Standing status={r.status === 'done' ? r.verdict || 'uncertain' : 'error'} />
+              <span className="mono">
+                {new Date(r.created_at + 'Z').toLocaleDateString()} @{' '}
+                {(r.commit_sha || '').slice(0, 10)}
+              </span>
             </div>
           ))}
-        </>
+        </section>
       )}
     </>
   )

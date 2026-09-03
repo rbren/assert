@@ -2,16 +2,23 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { api } from '../api'
+import { SectionHead, StandingAxis } from '../components.jsx'
 
 export default function ProjectList() {
-  const [projects, setProjects] = useState([])
+  const [projects, setProjects] = useState(null)
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
-    api.listProjects().then(setProjects).catch((e) => setError(e.message))
+    api
+      .listProjects()
+      .then(setProjects)
+      .catch((e) => {
+        setProjects([])
+        setError(e.message)
+      })
   }, [])
 
   async function submit(e) {
@@ -30,42 +37,72 @@ export default function ProjectList() {
 
   return (
     <>
-      <h1>Projects</h1>
-      <p className="muted">Paste a GitHub repository URL and press Enter.</p>
-      <form onSubmit={submit} style={{ margin: '16px 0 8px' }}>
-        <input
-          type="text"
-          value={url}
-          autoFocus
-          placeholder="https://github.com/owner/repo"
-          onChange={(e) => setUrl(e.target.value)}
-          disabled={busy}
-        />
-      </form>
-      {error && <div className="error">{error}</div>}
+      <section className="hero">
+        <h1>
+          Say what you believe about a codebase. Find out if it’s&nbsp;<em>true</em>.
+        </h1>
+        <p className="hero-sub">
+          An agent goes and reads the repository, hunts for counterexamples, and comes
+          back with a verdict — plus the commands and source it stands on, pinned to
+          the commit it read.
+        </p>
 
-      <h2>Your projects</h2>
-      {projects.length === 0 ? (
-        <p className="empty">Nothing here yet.</p>
-      ) : (
-        projects.map((p) => (
-          <Link key={p.id} to={`/projects/${p.id}`} className="card">
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <strong>{p.name}</strong>
-              <span className="muted">
-                {p.assertion_count} assertion{p.assertion_count === 1 ? '' : 's'}
-              </span>
-            </div>
-            <div className="mono muted">
-              {p.clone_status === 'ready'
-                ? `${p.default_branch} @ ${(p.head_commit || '').slice(0, 10)}`
-                : p.clone_status === 'error'
-                  ? `clone failed: ${p.clone_error}`
-                  : 'cloning…'}
-            </div>
-          </Link>
-        ))
-      )}
+        <form className="hero-form" onSubmit={submit}>
+          <label className="label" htmlFor="repo">
+            Start with a repository
+          </label>
+          <div className="hero-field">
+            <input
+              id="repo"
+              type="text"
+              value={url}
+              autoFocus
+              placeholder="github.com/owner/repo"
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={busy}
+            />
+            <button className="primary" disabled={busy || !url.trim()}>
+              {busy ? 'Cloning…' : 'Clone it'}
+            </button>
+          </div>
+          <p className="hero-hint">A full URL, or just owner/repo.</p>
+        </form>
+        {error && <div className="error">{error}</div>}
+      </section>
+
+      <section className="section">
+        <SectionHead
+          title="Repositories"
+          note={projects?.length ? `${projects.length} under watch` : ''}
+        />
+        {projects === null ? (
+          <p className="empty">Loading…</p>
+        ) : projects.length === 0 ? (
+          <p className="empty">
+            Nothing here yet. Clone a repository above and make your first claim.
+          </p>
+        ) : (
+          projects.map((p) => (
+            <Link key={p.id} to={`/projects/${p.id}`} className="project-row">
+              <div>
+                <div className="project-name">{p.name}</div>
+                <div className="project-meta">
+                  {p.clone_status === 'ready'
+                    ? `${p.default_branch} @ ${(p.head_commit || '').slice(0, 10)}`
+                    : p.clone_status === 'error'
+                      ? `clone failed — ${p.clone_error}`
+                      : 'cloning…'}
+                </div>
+              </div>
+              <StandingAxis counts={p.standing} total={p.assertion_count} ends={false} />
+              <div className="project-count">
+                <strong>{p.assertion_count}</strong>
+                claim{p.assertion_count === 1 ? '' : 's'}
+              </div>
+            </Link>
+          ))
+        )}
+      </section>
     </>
   )
 }

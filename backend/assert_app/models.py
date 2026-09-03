@@ -106,21 +106,36 @@ class Assertion(Base):
         return self.remediations[0] if self.remediations else None
 
     @property
+    def status(self) -> str:
+        """Where the claim stands: its verdict, or the state of getting one."""
+        run = self.latest_run
+        if run is None:
+            return "queued"
+        if run.status in {"tidying", "investigating"}:
+            return "checking"
+        if run.status == "error":
+            return "error"
+        return run.verdict or "uncertain"
+
+    @property
     def status_rank(self) -> int:
         """Sort key: things needing attention first, settled truths last."""
-        run = self.latest_run
-        if run is None or run.status in {"tidying", "investigating"}:
-            return 0
-        if run.status == "error":
-            return 1
-        return {
-            "false": 2,
-            "mostly_false": 3,
-            "partly_true": 4,
-            "uncertain": 5,
-            "unverifiable": 6,
-            "true": 7,
-        }.get(run.verdict or "", 5)
+        return STATUS_ORDER.index(self.status) if self.status in STATUS_ORDER else 99
+
+
+# Worst-first: refuted claims outrank claims that hold, and work still in
+# flight outranks everything, since it is about to change the picture.
+STATUS_ORDER: list[str] = [
+    "checking",
+    "queued",
+    "error",
+    "false",
+    "mostly_false",
+    "partly_true",
+    "uncertain",
+    "unverifiable",
+    "true",
+]
 
 
 class Run(Base):

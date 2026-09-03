@@ -3,80 +3,80 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api'
 import {
+  AxisLegend,
   CATEGORIES,
-  Category,
+  Chip,
   Freshness,
+  Inline,
   PRIORITIES,
-  Priority,
-  STATUS_LABEL,
-  Verdict,
+  STANDING,
+  Standing,
+  StandingAxis,
   priorityRank,
-  statusKey,
+  statusOf,
   statusRank,
+  tally,
 } from '../components.jsx'
 
 const POLL_MS = 4000
 
 const SORTS = {
-  status: { label: 'Status', key: statusRank },
+  standing: { label: 'Standing', key: statusRank },
   priority: { label: 'Priority', key: priorityRank },
-  age: { label: 'Staleness', key: (a) => -(a.latest_run?.commits_behind ?? -1) },
+  staleness: {
+    label: 'Staleness',
+    key: (a) => -(a.latest_run?.commits_behind ?? -1),
+  },
   category: { label: 'Category', key: (a) => a.category || '' },
-  title: { label: 'Title', key: (a) => (a.title || a.text).toLowerCase() },
   newest: { label: 'Newest', key: (a) => -a.id },
 }
 
-function AssertionRow({ a, onReinvestigate, onFix, busy }) {
+function ClaimRow({ a, onRecheck, onFix, busy }) {
   const run = a.latest_run
-  const status = statusKey(a)
+  const status = statusOf(a)
   const canFix = run?.status === 'done' && run.verdict !== 'true' && run.fixes?.length > 0
   const fixing = a.latest_remediation?.status === 'working'
   return (
-    <tr>
-      <td className="cell-title">
+    <div className="claim-row">
+      <div className="claim-emoji" aria-hidden="true">
+        {a.emoji}
+      </div>
+      <div>
         <Link to={`/assertions/${a.id}`}>
-          <span className="row-emoji">{a.emoji}</span>
-          <span className="row-title">{a.title || a.text.slice(0, 40)}</span>
+          {a.title && <div className="claim-title">{a.title}</div>}
+          <div className="claim-text">
+            <Inline>{a.text}</Inline>
+          </div>
         </Link>
-        <div className="row-sub">{a.text.slice(0, 110)}</div>
-      </td>
-      <td>
-        <Category value={a.category} />
-      </td>
-      <td>
-        <Priority value={a.priority} />
-      </td>
-      <td>
-        <Verdict run={run} />
-      </td>
-      <td>
-        <Freshness run={run} />
-      </td>
-      <td className="cell-actions">
+        <div className="claim-tags">
+          <Chip>{a.category}</Chip>
+          <Chip className={a.priority}>{a.priority} priority</Chip>
+          <Freshness run={run} />
+          {fixing && (
+            <Chip>
+              <span className="spinner" /> fixing
+            </Chip>
+          )}
+        </div>
+      </div>
+      <div className="claim-standing">
+        <Standing status={status} />
+      </div>
+      <div className="claim-actions">
         <button
-          className="icon"
-          title="Re-investigate at current HEAD"
-          disabled={busy || run?.status === 'investigating'}
-          onClick={() => onReinvestigate(a.id)}
+          className="quiet"
+          disabled={busy || status === 'checking'}
+          onClick={() => onRecheck(a.id)}
         >
-          ↻
+          Check again
         </button>
-        <button
-          className="icon"
-          title={
-            fixing
-              ? 'A fix is already in progress'
-              : canFix
-                ? 'Send an agent to apply the top fix'
-                : 'No fixes available'
-          }
-          disabled={busy || fixing || !canFix}
-          onClick={() => onFix(a.id)}
-        >
-          🔧
-        </button>
-      </td>
-    </tr>
+        {canFix && (
+          <button className="quiet" disabled={busy || fixing} onClick={() => onFix(a.id)}>
+            Fix it
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -88,8 +88,8 @@ export default function ProjectPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const [sortBy, setSortBy] = useState('status')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('standing')
+  const [standingFilter, setStandingFilter] = useState(null)
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
 
@@ -105,15 +105,15 @@ export default function ProjectPage() {
     load()
   }, [load])
 
-  // Poll while anything is still in motion (cloning, a run, or a fix).
+  // Poll while anything is still in motion: a clone, a check, or a fix.
   useEffect(() => {
     const pending =
       project &&
       (project.clone_status === 'cloning' ||
         project.assertions.some(
           (a) =>
-            !a.latest_run ||
-            a.latest_run.status === 'investigating' ||
+            statusOf(a) === 'checking' ||
+            statusOf(a) === 'queued' ||
             a.latest_remediation?.status === 'working',
         ))
     if (!pending) return
@@ -121,25 +121,27 @@ export default function ProjectPage() {
     return () => clearTimeout(timer.current)
   }, [project, load])
 
+  const counts = useMemo(() => tally(project?.assertions || []), [project])
+
   const visible = useMemo(() => {
     if (!project) return []
     const rows = project.assertions.filter(
       (a) =>
-        (statusFilter === 'all' || statusKey(a) === statusFilter) &&
+        (!standingFilter || statusOf(a) === standingFilter) &&
         (categoryFilter === 'all' || a.category === categoryFilter) &&
         (priorityFilter === 'all' || a.priority === priorityFilter),
     )
     const keyOf = SORTS[sortBy].key
-    // Status is the tiebreaker for every other sort, so equal rows still
-    // surface the ones needing attention first.
-    return rows.sort((x, y) => {
+    // Standing breaks every other tie, so equal rows still lead with whatever
+    // is most in need of attention.
+    return [...rows].sort((x, y) => {
       const kx = keyOf(x)
       const ky = keyOf(y)
       if (kx < ky) return -1
       if (kx > ky) return 1
       return statusRank(x) - statusRank(y) || y.id - x.id
     })
-  }, [project, sortBy, statusFilter, categoryFilter, priorityFilter])
+  }, [project, sortBy, standingFilter, categoryFilter, priorityFilter])
 
   async function submit(e) {
     e.preventDefault()
@@ -171,7 +173,7 @@ export default function ProjectPage() {
   }
 
   async function remove() {
-    if (!confirm(`Delete ${project.name} and all its assertions?`)) return
+    if (!confirm(`Delete ${project.name} and every claim about it?`)) return
     await api.deleteProject(projectId)
     navigate('/')
   }
@@ -179,146 +181,156 @@ export default function ProjectPage() {
   if (!project) return <p className="empty">{error || 'Loading…'}</p>
 
   const ready = project.clone_status === 'ready'
-  const statuses = [...new Set(project.assertions.map(statusKey))]
+  const total = project.assertions.length
+  const filtered = visible.length !== total
 
   return (
     <>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h1>{project.name}</h1>
-        <div className="row">
-          <button onClick={() => act(() => api.refreshProject(projectId))}>
-            Refresh checkout
-          </button>
-          <button className="danger" onClick={remove}>
-            Delete
-          </button>
-        </div>
-      </div>
-      <div className="mono muted">
-        {ready
-          ? `${project.default_branch} @ ${(project.head_commit || '').slice(0, 10)}`
-          : project.clone_status === 'error'
-            ? `clone failed: ${project.clone_error}`
-            : 'cloning…'}
-      </div>
-
-      <h2>New assertion</h2>
-      <form onSubmit={submit}>
-        <textarea
-          rows={2}
-          value={text}
-          placeholder="e.g. Every public function in the API layer has a type-annotated return value."
-          disabled={!ready || busy}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) submit(e)
-          }}
-        />
-        <div className="row" style={{ marginTop: 8, justifyContent: 'space-between' }}>
+      <section className="project-head">
+        <Link to="/" className="crumb">
+          ← all repositories
+        </Link>
+        <div className="row spread wrap-row">
+          <h1>{project.name}</h1>
           <div className="row">
-            <label className="muted" htmlFor="new-priority">
-              Priority
-            </label>
-            <select
-              id="new-priority"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
+            <button
+              className="quiet"
+              disabled={busy}
+              onClick={() => act(() => api.refreshProject(projectId))}
             >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-            <span className="muted">Enter to submit, Shift+Enter for a new line.</span>
+              Pull latest commits
+            </button>
+            <button className="quiet danger" onClick={remove}>
+              Delete repository
+            </button>
           </div>
-          <button className="primary" disabled={!ready || busy || !text.trim()}>
-            {busy ? 'Submitting…' : 'Assert'}
-          </button>
         </div>
-      </form>
-      {error && <div className="error">{error}</div>}
+        <div className="mono muted" style={{ marginTop: 6 }}>
+          {ready
+            ? `${project.default_branch} @ ${(project.head_commit || '').slice(0, 10)}`
+            : project.clone_status === 'error'
+              ? `clone failed — ${project.clone_error}`
+              : 'cloning…'}
+        </div>
+      </section>
 
-      <div className="row" style={{ justifyContent: 'space-between', marginTop: 28 }}>
-        <h2 style={{ margin: 0 }}>
-          Assertions{' '}
-          <span className="muted">
-            ({visible.length}
-            {visible.length !== project.assertions.length
-              ? ` of ${project.assertions.length}`
-              : ''}
-            )
-          </span>
-        </h2>
-        <div className="row filters">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="all">All statuses</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABEL[s] || s}
-              </option>
-            ))}
-          </select>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          >
-            <option value="all">All categories</option>
+      {total > 0 && (
+        <section className="standing-panel">
+          <div className="row spread wrap-row" style={{ marginBottom: 12 }}>
+            <span className="label">Where {total} claim{total === 1 ? '' : 's'} stand</span>
+            {standingFilter && (
+              <button className="link" onClick={() => setStandingFilter(null)}>
+                Clear the {STANDING[standingFilter].name.toLowerCase()} filter
+              </button>
+            )}
+          </div>
+          <StandingAxis
+            counts={counts}
+            total={total}
+            selected={standingFilter}
+            onSelect={setStandingFilter}
+          />
+          <AxisLegend counts={counts} />
+        </section>
+      )}
+
+      <section className="compose">
+        <form onSubmit={submit}>
+          <label className="label" htmlFor="claim" style={{ display: 'block', marginBottom: 8 }}>
+            Make a claim about this code
+          </label>
+          <textarea
+            id="claim"
+            rows={2}
+            value={text}
+            placeholder="Every public function in the API layer declares a return type."
+            disabled={!ready || busy}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) submit(e)
+            }}
+          />
+          <div className="compose-foot">
+            <div className="row">
+              <label className="label" htmlFor="new-priority">
+                Priority
+              </label>
+              <select
+                id="new-priority"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+              >
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <span className="mono muted">Enter to send · Shift+Enter for a new line</span>
+            </div>
+            <button className="primary" disabled={!ready || busy || !text.trim()}>
+              {busy ? 'Sending…' : 'Check this claim'}
+            </button>
+          </div>
+        </form>
+        {!ready && project.clone_status === 'cloning' && (
+          <p className="mono muted" style={{ marginTop: 10 }}>
+            <span className="spinner" /> Waiting for the clone to finish.
+          </p>
+        )}
+        {error && <div className="error">{error}</div>}
+      </section>
+
+      <div className="toolbar">
+        <span className="toolbar-count">
+          {filtered ? `${visible.length} of ${total} claims` : `${total} claim${total === 1 ? '' : 's'}`}
+        </span>
+        <div className="row wrap-row">
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="all">Every category</option>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </select>
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-          >
-            <option value="all">All priorities</option>
+          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+            <option value="all">Every priority</option>
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
-                {p}
+                {p} priority
               </option>
             ))}
           </select>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             {Object.entries(SORTS).map(([k, v]) => (
               <option key={k} value={k}>
-                Sort: {v.label}
+                Sort by {v.label.toLowerCase()}
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      {project.assertions.length === 0 ? (
-        <p className="empty">No assertions yet.</p>
+      {total === 0 ? (
+        <p className="empty">
+          No claims yet. Write what you believe is true about this repository and an
+          agent will go and check it.
+        </p>
       ) : visible.length === 0 ? (
-        <p className="empty">No assertions match these filters.</p>
+        <p className="empty">Nothing matches these filters.</p>
       ) : (
-        <table className="assertions">
-          <thead>
-            <tr>
-              <th>Assertion</th>
-              <th>Category</th>
-              <th>Priority</th>
-              <th>Status</th>
-              <th>Evidence</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((a) => (
-              <AssertionRow
-                key={a.id}
-                a={a}
-                busy={busy}
-                onReinvestigate={(id) => act(() => api.reverify(id))}
-                onFix={(id) => act(() => api.remediate(id))}
-              />
-            ))}
-          </tbody>
-        </table>
+        <div className="ledger">
+          {visible.map((a) => (
+            <ClaimRow
+              key={a.id}
+              a={a}
+              busy={busy}
+              onRecheck={(id) => act(() => api.reverify(id))}
+              onFix={(id) => act(() => api.remediate(id))}
+            />
+          ))}
+        </div>
       )}
     </>
   )

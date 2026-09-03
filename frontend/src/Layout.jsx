@@ -5,10 +5,11 @@ export default function Layout() {
     <>
       <header className="top">
         <div className="wrap">
-          <Link to="/" className="brand">
-            assert<span className="brand-dot">.</span>
+          <Link to="/" className="brand" aria-label="assert, home">
+            <span className="brand-mark" aria-hidden="true" />
+            assert
           </Link>
-          <span className="tagline">claims about a codebase, checked against evidence</span>
+          <span className="tagline">say it, then find out</span>
         </div>
       </header>
       <main className="wrap">

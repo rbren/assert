@@ -24,6 +24,8 @@ class ProjectSummary(BaseModel):
     clone_error: str | None
     created_at: datetime
     assertion_count: int = 0
+    # status → how many of this project's claims are standing there.
+    standing: dict[str, int] = {}
 
 
 class EvidenceOut(BaseModel):
@@ -103,6 +105,7 @@ class AssertionOut(BaseModel):
     emoji: str
     category: str
     priority: str
+    status: str
     created_at: datetime
     updated_at: datetime
     latest_run: RunOut | None = None

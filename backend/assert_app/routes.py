@@ -49,6 +49,7 @@ def _assertion_out(a: Assertion) -> AssertionOut:
         emoji=a.emoji,
         category=a.category,
         priority=a.priority,
+        status=a.status,
         created_at=a.created_at,
         updated_at=a.updated_at,
         latest_run=_run_out(a.latest_run, a.project),
@@ -61,6 +62,9 @@ def _assertion_out(a: Assertion) -> AssertionOut:
 
 
 def _project_summary(p: Project) -> ProjectSummary:
+    standing: dict[str, int] = {}
+    for a in p.assertions:
+        standing[a.status] = standing.get(a.status, 0) + 1
     return ProjectSummary(
         id=p.id,
         repo_url=p.repo_url,
@@ -72,6 +76,7 @@ def _project_summary(p: Project) -> ProjectSummary:
         clone_error=p.clone_error,
         created_at=p.created_at,
         assertion_count=len(p.assertions),
+        standing=standing,
     )
 
 

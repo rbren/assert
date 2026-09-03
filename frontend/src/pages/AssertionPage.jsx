@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
-import { api } from '../api'
+import { api, transcriptUrl, useCanvasUrl } from '../api'
 import {
   Attempt,
   CATEGORIES,
@@ -109,6 +109,7 @@ function InlineField({ value, onCommit, className, maxLength, ariaLabel, placeho
 
 export default function AssertionPage() {
   const { assertionId } = useParams()
+  const canvas = useCanvasUrl()
   const [assertion, setAssertion] = useState(null)
   const [runs, setRuns] = useState([])
   const [attempts, setAttempts] = useState([])
@@ -177,6 +178,7 @@ export default function AssertionPage() {
   const fixing = assertion.latest_remediation?.status === 'working'
   const fresh = freshness(run)
   const checkedAt = parseUTC(run?.finished_at || run?.created_at)
+  const runTranscript = transcriptUrl(canvas, run?.conversation_id)
 
   return (
     <>
@@ -319,12 +321,12 @@ export default function AssertionPage() {
             </dd>
             <dt>Exhibits</dt>
             <dd>{run?.evidence?.length ?? 0}</dd>
-            {run?.conversation_id && (
+            {runTranscript && (
               <>
                 <dt>Agent</dt>
                 <dd>
                   <a
-                    href={`/conversations/${run.conversation_id}`}
+                    href={runTranscript}
                     target="_blank"
                     rel="noreferrer"
                     style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}
@@ -338,17 +340,33 @@ export default function AssertionPage() {
         </aside>
       </section>
 
-      {settled && run.fixes?.length > 0 && (
+      {settled && (run.fixes?.length > 0 || attempts.length > 0) && (
         <section className="section">
           <SectionHead
             title="Proposed fixes"
             note="an agent applies the one you pick and opens a pull request"
           />
-          <FixList
-            fixes={run.fixes}
-            busy={busy || fixing}
-            onApply={(fixId) => act(() => api.remediate(assertionId, fixId))}
-          />
+          {run.fixes?.length > 0 && (
+            <FixList
+              fixes={run.fixes}
+              busy={busy || fixing}
+              onApply={(fixId) => act(() => api.remediate(assertionId, fixId))}
+            />
+          )}
+          {attempts.length > 0 && (
+            <div className="attempts">
+              <div className="label attempts-label">
+                {attempts.length === 1 ? 'Attempt' : 'Attempts'}
+              </div>
+              {attempts.map((r) => (
+                <Attempt
+                  key={r.id}
+                  remediation={r}
+                  onDiscard={(id) => act(() => api.discardRemediation(id))}
+                />
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -363,19 +381,6 @@ export default function AssertionPage() {
             }
           />
           <ExhibitList evidence={run.evidence} />
-        </section>
-      )}
-
-      {attempts.length > 0 && (
-        <section className="section">
-          <SectionHead title="Fix attempts" />
-          {attempts.map((r) => (
-            <Attempt
-              key={r.id}
-              remediation={r}
-              onDiscard={(id) => act(() => api.discardRemediation(id))}
-            />
-          ))}
         </section>
       )}
 

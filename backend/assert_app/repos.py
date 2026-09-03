@@ -7,12 +7,13 @@ commit recorded with the evidence is the one the agent actually saw.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .config import CHECKOUTS_DIR, WORKTREES_DIR
+from .config import CHECKOUTS_DIR, GITHUB_TOKEN_ENVS, WORKTREES_DIR
 
 log = logging.getLogger(__name__)
 
@@ -75,25 +76,56 @@ def _git(*args: str, cwd: Path, check: bool = True) -> subprocess.CompletedProce
     )
 
 
+def _github_token() -> str | None:
+    for env in GITHUB_TOKEN_ENVS:
+        v = os.environ.get(env)
+        if v and v.strip():
+            return v.strip()
+    return None
+
+
+def _authed_url(url: str, token: str | None) -> str:
+    """``url`` with ``token`` embedded, so private repos can be read.
+
+    Only ever passed as a command argument — never written to git config, so
+    the token does not persist in the checkout.
+    """
+    if not token:
+        return url
+    m = re.match(r"^https://(?:[^@/]+@)?(.+)$", url)
+    return f"https://x-access-token:{token}@{m.group(1)}" if m else url
+
+
+def _scrub(text: str, token: str | None) -> str:
+    out = text.replace(token, "***") if token else text
+    return re.sub(r"https://[^\s@]+@", "https://", out).strip()
+
+
 def clone_or_update(clone_url: str, slug: str) -> tuple[str, str]:
     """Clone (or fetch+reset) the repo. Returns ``(head_sha, branch)``."""
     CHECKOUTS_DIR.mkdir(parents=True, exist_ok=True)
     dest = checkout_path(slug)
+    token = _github_token()
+    fetch_url = _authed_url(clone_url, token)
 
     if not (dest / ".git").exists():
         r = subprocess.run(
-            ["git", "clone", "--quiet", clone_url, str(dest)],
+            ["git", "clone", "--quiet", fetch_url, str(dest)],
             capture_output=True,
             text=True,
             env=_GIT_ENV,
             timeout=1800,
         )
         if r.returncode != 0:
-            raise RepoError(r.stderr.strip() or "git clone failed")
+            raise RepoError(_scrub(r.stderr, token) or "git clone failed")
+        # Drop the credential the clone was made with; it is re-supplied per
+        # call instead of living in .git/config.
+        _git("remote", "set-url", "origin", clone_url, cwd=dest, check=False)
     else:
-        r = _git("fetch", "--quiet", "origin", cwd=dest, check=False)
+        r = _git("fetch", "--quiet", fetch_url, "+refs/heads/*:refs/remotes/origin/*",
+                 cwd=dest, check=False)
         if r.returncode != 0:
-            log.warning("fetch failed for %s: %s", slug, r.stderr.strip())
+            log.warning("fetch failed for %s: %s", slug, _scrub(r.stderr, token))
 
     branch = _git("rev-parse", "--abbrev-ref", "HEAD", cwd=dest).stdout.strip()
     upstream = _git(
@@ -193,17 +225,15 @@ def push_branch(slug: str, branch: str, token: str) -> None:
     if not wt.exists():
         raise RepoError(f"No worktree for {branch}")
     origin = _git("remote", "get-url", "origin", cwd=wt).stdout.strip()
-    m = re.match(r"^https://(?:[^@/]+@)?(.+)$", origin)
-    if not m:
+    if not origin.startswith("https://"):
         raise RepoError(f"Can only push https remotes, got {origin!r}")
-    authed = f"https://x-access-token:{token}@{m.group(1)}"
 
-    r = _git("push", "--force-with-lease", authed, f"{branch}:{branch}", cwd=wt, check=False)
+    r = _git(
+        "push", "--force-with-lease", _authed_url(origin, token),
+        f"{branch}:{branch}", cwd=wt, check=False,
+    )
     if r.returncode != 0:
-        # Never surface the URL: it carries the token.
-        err = (r.stderr or "").replace(token, "***")
-        err = re.sub(r"https://[^\s]+", "<remote>", err).strip()
-        raise RepoError(err or "git push failed")
+        raise RepoError(_scrub(r.stderr or "", token) or "git push failed")
 
 
 def worktree_diff(slug: str, branch: str, base: str) -> str:

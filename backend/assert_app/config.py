@@ -30,6 +30,12 @@ AGENT_SERVER_URL: str = os.environ.get(
 # Conversation tag key; value is ``assertion-<id>``.
 TAG_KEY: str = "assert"
 
+# Where agent transcripts are readable. assert runs on its own vhost, so a
+# relative /conversations/<id> link would resolve against assert itself.
+CANVAS_URL: str = os.environ.get(
+    "ASSERT_CANVAS_URL", "https://canvas.rbren.io"
+).rstrip("/")
+
 # Model id served by the agent-server's OpenAI-compatible endpoint, used for
 # the cheap "tidy up this assertion" call. See GET /v1/models.
 TIDY_MODEL: str = os.environ.get("ASSERT_TIDY_MODEL", "openhands_fable")

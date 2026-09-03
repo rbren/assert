@@ -49,11 +49,13 @@
   --attention-dim: #6f8698;
   --attention-wash: rgba(90, 166, 232, 0.1);
 
-  /* Staleness of the evidence. Three states only, because the question is
-     "can I still trust this?" and the answer is yes / probably / no. */
-  --fresh: var(--holds);
-  --drifting: var(--partly);
-  --stale: var(--refuted);
+  /* Staleness of the evidence — deliberately NOT aliased to the verdict ramp
+     even though the hues are neighbours. These answer "can I still trust this
+     reading?", not "is the claim true?", and a refuted claim checked an hour
+     ago must not wear the same green as a claim that holds. Separate tokens
+     keep the two questions from drifting into each other later. */
+  --drifting: #c9922f;
+  --stale: #cf5350;
 
   --display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
   --claim: 'Newsreader', ui-serif, Georgia, serif;
@@ -273,19 +275,19 @@ button:disabled {
   color: var(--ink-3);
   cursor: not-allowed;
 }
-/* The affirmative colour of the scale carries the primary action. In light
-   mode that job went to a solid ink slab; its dark counterpart is the accent,
-   not white, which would halate at this size. */
+/* Neutral, not green. A primary button is an action, never a verdict — a green
+   CTA on a page about whether things are true reads as an answer. Contrast
+   alone carries the emphasis. */
 button.primary {
-  background: var(--holds);
-  border-color: var(--holds);
-  color: var(--on-verdict);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
   font-weight: 600;
 }
 button.primary:hover:not(:disabled) {
-  background: var(--holds-bright);
-  border-color: var(--holds-bright);
-  color: var(--on-verdict);
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--paper);
 }
 button.primary:disabled {
   background: var(--rule-soft);
@@ -574,40 +576,40 @@ select:not(.chip-select):focus {
   padding: 2px 7px;
   white-space: nowrap;
 }
-/* Evidence age. The dot carries the state at a glance; the words carry the two
-   measurements behind it. Green is quiet — being current is the expected case
-   and should not compete with anything. */
+/* Evidence age.
+   The colour is confined to the pip. The chip's text stays neutral so that
+   coloured *words* remain the verdict's alone — otherwise a refuted claim
+   carries two unrelated red things on one row, and a refuted claim with fresh
+   evidence gets a reassuring green one. Being current is the expected case and
+   says nothing; only drift earns a hue. */
 .chip.fresh-fresh,
 .chip.fresh-drifting,
 .chip.fresh-stale {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  color: var(--ink-3);
 }
 .fresh-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--ink-3);
   flex: none;
 }
 .fresh-sep {
   opacity: 0.5;
 }
-.chip.fresh-fresh {
-  color: var(--fresh);
-  border-color: color-mix(in srgb, var(--fresh) 45%, transparent);
+.chip.fresh-drifting .fresh-dot {
+  background: var(--drifting);
 }
-.chip.fresh-drifting {
-  color: var(--drifting);
-  border-color: color-mix(in srgb, var(--drifting) 55%, transparent);
-}
-/* Both kinds of drift agree here, so this one is allowed to be loud. */
+/* Both kinds of drift agree here, so this one state is allowed to speak up. */
 .chip.fresh-stale {
   color: var(--stale);
-  border-color: var(--stale);
-  background: color-mix(in srgb, var(--stale) 12%, transparent);
-  font-weight: 600;
+  border-color: color-mix(in srgb, var(--stale) 50%, transparent);
+}
+.chip.fresh-stale .fresh-dot {
+  background: var(--stale);
 }
 
 /* Priority is colour-coded on its own hue — azurite, deliberately outside the
@@ -1112,6 +1114,40 @@ pre.blank {
 .pr-none {
   margin-top: 12px;
 }
+.attempt-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.attempt-links:empty {
+  display: none;
+}
+.transcript-link {
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.transcript-link:hover {
+  color: var(--ink);
+}
+
+/* Attempts are outcomes of the fixes above them, so they are indented under
+   the same heading rather than competing with it. */
+.attempts {
+  margin-top: 26px;
+  padding-left: 18px;
+  border-left: 2px solid var(--rule);
+}
+.attempts-label {
+  margin-bottom: 4px;
+}
+.attempts .attempt:first-of-type {
+  margin-top: 8px;
+}
 .chip.pr-chip {
   color: var(--holds);
   border-color: var(--holds);
@@ -1200,8 +1236,10 @@ details.diff pre {
 
 .claim-edit {
   margin: 18px 0 0;
-  max-width: 34ch;
 }
+/* The measure belongs to the claim itself, not to the controls under it —
+   34ch is a reading line length, and squeezing a button row into it just makes
+   the row wrap. */
 .claim-field {
   font-family: var(--claim);
   font-size: clamp(22px, 2.9vw, 30px);
@@ -1210,6 +1248,7 @@ details.diff pre {
   resize: none;
   overflow: hidden;
   display: block;
+  max-width: 34ch;
 }
 /* The claim is the one field whose edit costs a verdict, so while it is dirty
    it is marked as unsettled rather than saved-in-place like the rest. */
@@ -1220,15 +1259,13 @@ details.diff pre {
 .claim-confirm {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
   flex-wrap: wrap;
-  margin-top: 12px;
+  margin-top: 14px;
   padding-left: 6px;
 }
 .claim-confirm .mono {
   font-size: 11.5px;
-  max-width: 34ch;
 }
 
 .claim-meta {

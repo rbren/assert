@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Markdown from 'react-markdown'
+import { transcriptUrl, useCanvasUrl } from './api'
 import { freshness, timeAgo } from './freshness'
 
 export const CATEGORIES = [
@@ -315,7 +316,9 @@ export function FixList({ fixes, onApply, busy }) {
 }
 
 export function Attempt({ remediation: r, onDiscard }) {
+  const canvas = useCanvasUrl()
   if (!r) return null
+  const transcript = transcriptUrl(canvas, r.conversation_id)
   return (
     <div className="attempt">
       <div className="attempt-head">
@@ -337,12 +340,19 @@ export function Attempt({ remediation: r, onDiscard }) {
       </div>
       {r.error && <div className="error">{r.error}</div>}
       <Md className="small">{r.summary}</Md>
-      {r.pr_url && (
-        <a className="pr-link" href={r.pr_url} target="_blank" rel="noreferrer">
-          <span className="pr-mark">⑂</span>
-          View pull request #{r.pr_number} ↗
-        </a>
-      )}
+      <div className="attempt-links">
+        {r.pr_url && (
+          <a className="pr-link" href={r.pr_url} target="_blank" rel="noreferrer">
+            <span className="pr-mark">⑂</span>
+            View pull request #{r.pr_number} ↗
+          </a>
+        )}
+        {transcript && (
+          <a className="transcript-link" href={transcript} target="_blank" rel="noreferrer">
+            read the agent transcript ↗
+          </a>
+        )}
+      </div>
       {r.pr_error && (
         <p className="muted small pr-none">No pull request: {r.pr_error}</p>
       )}

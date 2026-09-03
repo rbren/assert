@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 async function req(path, options = {}) {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -42,4 +44,34 @@ export const api = {
     }),
   listRemediations: (id) => req(`/assertions/${id}/remediations`),
   discardRemediation: (id) => req(`/remediations/${id}`, { method: 'DELETE' }),
+
+  health: () => req('/health'),
+}
+
+// Transcripts live on the agent-canvas host, not on assert's own domain, so
+// the base URL comes from the backend rather than being relative. Fetched
+// once and shared; components read it through useCanvasUrl().
+let canvasUrlPromise = null
+
+export function loadCanvasUrl() {
+  if (!canvasUrlPromise) {
+    canvasUrlPromise = api.health().then((h) => h?.canvas_url || '')
+  }
+  return canvasUrlPromise
+}
+
+export function useCanvasUrl() {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    let live = true
+    loadCanvasUrl().then((u) => live && setUrl(u))
+    return () => {
+      live = false
+    }
+  }, [])
+  return url
+}
+
+export function transcriptUrl(base, conversationId) {
+  return base && conversationId ? `${base}/conversations/${conversationId}` : null
 }

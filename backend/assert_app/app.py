@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
 from . import verification
-from .config import CORS_ORIGINS, POLL_INTERVAL_SECONDS
+from .config import CANVAS_URL, CORS_ORIGINS, POLL_INTERVAL_SECONDS
 from .db import engine, session_scope
 from .models import Base, Remediation, Run
 from .routes import router
@@ -69,7 +69,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"ok": True}
+        return {"ok": True, "canvas_url": CANVAS_URL}
 
     return app
 

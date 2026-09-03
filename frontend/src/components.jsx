@@ -223,6 +223,26 @@ function NumberedCode({ content, startLine }) {
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
+/* Which side an exhibit argues. Older runs carry no stance, and an unlabelled
+ * exhibit shows nothing rather than being guessed onto a side. */
+export const STANCE = {
+  for: { sign: '+', name: 'for', blurb: 'This exhibit supports the claim.' },
+  against: { sign: '−', name: 'against', blurb: 'This exhibit undercuts the claim.' },
+}
+
+function Stance({ stance }) {
+  const s = STANCE[stance]
+  if (!s) return null
+  return (
+    <span className="exhibit-stance" data-stance={stance} title={s.blurb}>
+      <span className="stance-sign" aria-hidden="true">
+        {s.sign}
+      </span>
+      {s.name}
+    </span>
+  )
+}
+
 export function Exhibit({ item, letter }) {
   const [open, setOpen] = useState(false)
   const isCommand = item.kind === 'command'
@@ -242,18 +262,21 @@ export function Exhibit({ item, letter }) {
       <button className="exhibit-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         <span className="exhibit-letter">{letter}</span>
         <span className="exhibit-caption">{item.caption || ref}</span>
-        <span className="exhibit-kind">
-          {isCommand ? (
-            item.exit_code === null ? (
-              'command'
+        <span className="exhibit-tags">
+          <Stance stance={item.stance} />
+          <span className="exhibit-kind">
+            {isCommand ? (
+              item.exit_code === null ? (
+                'command'
+              ) : (
+                <span className={item.exit_code === 0 ? 'exit-0' : 'exit-n'}>
+                  exit {item.exit_code}
+                </span>
+              )
             ) : (
-              <span className={item.exit_code === 0 ? 'exit-0' : 'exit-n'}>
-                exit {item.exit_code}
-              </span>
-            )
-          ) : (
-            'source'
-          )}
+              'source'
+            )}
+          </span>
         </span>
       </button>
       {open && (

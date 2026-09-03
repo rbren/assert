@@ -981,12 +981,39 @@ select:not(.chip-select):focus {
   font-size: 17px;
   line-height: 1.4;
 }
+.exhibit-tags {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+}
 .exhibit-kind {
   font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
+}
+/* Which side an exhibit argues. It reads like a verdict but is not one — a
+   refuted claim can rest on an exhibit that argues for it — so it borrows no
+   colour from the scale and is told by its sign and its weight instead. The
+   word is always there; the sign only repeats it. */
+.exhibit-stance {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.exhibit-stance[data-stance='against'] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.stance-sign {
+  font-size: 12px;
+  line-height: 1;
 }
 .exhibit-body {
   padding: 0 4px 20px 48px;

@@ -34,6 +34,8 @@ class EvidenceOut(BaseModel):
     id: int
     kind: str
     caption: str
+    # "for" | "against", or "" on runs ingested before stances existed.
+    stance: str
     command: str | None
     exit_code: int | None
     stdout: str | None

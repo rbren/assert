@@ -15,6 +15,7 @@ ADD_COLUMNS = [
     ("assertions", "emoji", "TEXT NOT NULL DEFAULT ''"),
     ("assertions", "category", "TEXT NOT NULL DEFAULT 'quality'"),
     ("assertions", "priority", "TEXT NOT NULL DEFAULT 'medium'"),
+    ("evidence", "stance", "VARCHAR(10) NOT NULL DEFAULT ''"),
     ("remediations", "fix_id", "INTEGER REFERENCES proposed_fixes(id)"),
     ("remediations", "pr_url", "VARCHAR(500)"),
     ("remediations", "pr_number", "INTEGER"),

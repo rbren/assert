@@ -15,6 +15,7 @@ from .models import (
     CATEGORIES,
     DEFAULT_CATEGORY,
     EFFORTS,
+    STANCES,
     Assertion,
     Evidence,
     ProposedFix,
@@ -237,11 +238,18 @@ def ingest_report(db: Session, run: Run) -> bool:
         if not isinstance(item, dict):
             continue
         kind = "file" if str(item.get("kind")) == "file" else "command"
+        stance = str(item.get("stance") or "").strip().lower()
+        if stance not in STANCES:
+            stance = ""
+        elif run.verdict == "true":
+            # A claim that holds as stated has nothing standing against it.
+            stance = "for"
         ev = Evidence(
             run_id=run.id,
             position=i,
             kind=kind,
             caption=_clip(item.get("caption")),
+            stance=stance,
         )
         if kind == "command":
             ev.command = _clip(item.get("command"))

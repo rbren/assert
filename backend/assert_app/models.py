@@ -251,6 +251,9 @@ class Remediation(Base):
     fix: Mapped["ProposedFix | None"] = relationship("ProposedFix")
 
 
+STANCES: set[str] = {"for", "against"}
+
+
 class Evidence(Base):
     """A single reproducible artifact backing a run's verdict.
 
@@ -268,6 +271,9 @@ class Evidence(Base):
     position: Mapped[int] = mapped_column(Integer, default=0)
     kind: Mapped[str] = mapped_column(String(20))
     caption: Mapped[str] = mapped_column(Text, default="")
+    # Which side of the argument this artifact lands on: "for" | "against".
+    # Empty on runs ingested before the agent was asked to take a side.
+    stance: Mapped[str] = mapped_column(String(10), default="")
 
     # kind="command"
     command: Mapped[str | None] = mapped_column(Text, default=None)

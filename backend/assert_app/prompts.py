@@ -91,7 +91,7 @@ needed). Use exactly this shape:
 ```json
 {{
   "verdict": "true | partly_true | mostly_false | false | uncertain | unverifiable",
-  "summary": "Why the evidence settles it. Markdown, 2-4 sentences.",
+  "summary": "A **For** paragraph and an **Against** paragraph, 1-2 bullets each. Markdown.",
   "caveats": "Exceptions, ambiguities, or scope limits. Markdown. Empty string if none.",
   "fixes": [
     {{
@@ -106,6 +106,7 @@ needed). Use exactly this shape:
     {{
       "kind": "command",
       "caption": "One sentence: what this shows.",
+      "stance": "for | against",
       "command": "rg -n 'def widget_factory' --type py",
       "exit_code": 0,
       "stdout": "verbatim stdout, trimmed to the relevant part",
@@ -114,6 +115,7 @@ needed). Use exactly this shape:
     {{
       "kind": "file",
       "caption": "One sentence: what this shows.",
+      "stance": "for | against",
       "path": "src/widgets/factory.py",
       "start_line": 12,
       "end_line": 28
@@ -127,9 +129,37 @@ Rules for the report:
 `summary`, `caveats`, and `remediation` — short paragraphs, bullets for lists, \
 `backticks` for identifiers and paths. No headings, no preamble, no restating \
 the assertion.
+- `summary` is the high-level read of the case, written as two labelled \
+paragraphs — the case for the assertion, then the case against it:
+
+```markdown
+**For:** one sentence framing why the assertion holds.
+
+- The single strongest point.
+- At most one more.
+
+**Against:** one sentence framing why it does not.
+
+- The single strongest point.
+- At most one more.
+```
+
+  - **1-2 bullets per side, never more.** Do not walk through the evidence — \
+the exhibits are listed right below the summary, each already labelled `for` \
+or `against`. The summary is the argument, not the inventory.
+  - When `verdict` is `true` the claim holds with no material exceptions, so \
+there is nothing standing against it: write only the **For** paragraph and \
+omit **Against** entirely. Every other verdict has both paragraphs — if you \
+cannot find a genuine point for one side, say so in one line under that \
+heading rather than dropping it.
 - `caption` must be exactly one sentence. It is shown as a collapsed one-liner \
 the reader expands to see the command or code, so it has to stand on its own — \
 "17 of 48 files exceed 200 lines", not "This command checks file sizes".
+- `stance` says which side each exhibit argues: `for` if it supports the \
+assertion, `against` if it undercuts it. Every exhibit needs one, and it is \
+about the exhibit's own content, not the final verdict — a claim that comes \
+out `false` can still have `for` exhibits. When the verdict is `true`, every \
+exhibit is `for`.
 - `path` must be **relative to the repository root**, and the line numbers \
 must be the real ones at this commit — the UI re-reads the file at \
 `{commit_sha}` to render the excerpt, so wrong line numbers show the wrong code.

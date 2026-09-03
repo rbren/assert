@@ -47,6 +47,10 @@ Both LLM paths go through the local agent-server at `127.0.0.1:18000`:
   "Refuted" label is now "False").
 - The `Standing` component renders the verdict word plus an optional slider
   track; pass `track={false}` for compact list rows.
+- Exhibit stance (`for`/`against`) deliberately borrows no colour from the
+  verdict ramp — it is told by its sign and weight, since an exhibit's side is
+  not the run's verdict. Runs ingested before stances exist carry `""` and
+  render no marker.
 
 ## Gotchas
 

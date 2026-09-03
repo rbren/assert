@@ -240,7 +240,7 @@ export default function AssertionPage() {
           >
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
-                {p} priority
+                {p}
               </option>
             ))}
           </select>

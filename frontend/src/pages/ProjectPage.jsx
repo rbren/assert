@@ -69,7 +69,7 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
         </div>
       </div>
       <div className="claim-standing">
-        <Chip className={a.priority}>{a.priority} priority</Chip>
+        <Chip className={a.priority}>{a.priority}</Chip>
         <Standing status={status} track={false} />
       </div>
       <div className="claim-actions">

@@ -484,50 +484,14 @@ select:not(.chip-select):focus {
   height: 9px;
 }
 
-/* ─── Verdict marker ─────────────────────────────────────────────────── */
+/* ─── Verdict word ───────────────────────────────────────────────────── */
 
-/* A claim's position on the same scale the project axis uses: a tick sitting
-   at its verdict's place on the line, so the standing is readable without
-   decoding a colour. */
+/* A claim's verdict, named in the colour of its place on the scale. */
 .standing {
   display: inline-flex;
   align-items: center;
   gap: 9px;
   white-space: nowrap;
-}
-.standing-track {
-  position: relative;
-  width: 74px;
-  height: 3px;
-  background: var(--rule);
-  flex: none;
-}
-.standing-mark {
-  position: absolute;
-  top: -4px;
-  width: 3px;
-  height: 11px;
-  background: var(--ink);
-  transform: translateX(-1px);
-  transition: left 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-/* Off the scale: hollow, centred, and explicitly not a middling verdict. */
-.standing-mark.hollow {
-  background: transparent;
-  border: 1.5px solid var(--unsettled);
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  top: -3px;
-}
-/* Still checking: the marker travels the scale it has not yet settled on. */
-.standing-mark.searching {
-  animation: sweep 1.9s ease-in-out infinite;
-  background: var(--waiting);
-}
-@keyframes sweep {
-  0%, 100% { left: 6%; }
-  50% { left: 94%; }
 }
 .standing-name {
   font-family: var(--mono);
@@ -546,20 +510,6 @@ select:not(.chip-select):focus {
 .n-queued,
 .n-error { color: var(--waiting); }
 
-.standing.big .standing-track {
-  width: 190px;
-  height: 4px;
-}
-.standing.big .standing-mark {
-  width: 4px;
-  height: 15px;
-  top: -5px;
-}
-.standing.big .standing-mark.hollow {
-  width: 12px;
-  height: 12px;
-  top: -4px;
-}
 .standing.big .standing-name {
   font-size: 14px;
   letter-spacing: 0.08em;
@@ -1414,9 +1364,6 @@ details.diff pre {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
-  }
-  .standing-mark.searching {
-    left: 50%;
   }
 }
 

@@ -70,7 +70,7 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
       </div>
       <div className="claim-standing">
         <Chip className={a.priority}>{a.priority}</Chip>
-        <Standing status={status} track={false} />
+        <Standing status={status} />
       </div>
       <div className="claim-actions">
         <button
@@ -280,7 +280,6 @@ export default function ProjectPage() {
                   </option>
                 ))}
               </select>
-              <span className="mono muted">Enter to send · Shift+Enter for a new line</span>
             </div>
             <button className="primary" disabled={!ready || busy || !text.trim()}>
               {busy ? 'Sending…' : 'Check this claim'}

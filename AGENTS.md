@@ -45,8 +45,8 @@ Both LLM paths go through the local agent-server at `127.0.0.1:18000`:
 - Verdicts: internal status values (`false`, CSS `n-false`/`s-false`) stay
   lowercase code identifiers; only the user-facing labels change (e.g. the old
   "Refuted" label is now "False").
-- The `Standing` component renders the verdict word plus an optional slider
-  track; pass `track={false}` for compact list rows.
+- The `Standing` component renders the verdict word alone; the distribution
+  across a set of claims is the separate `StandingAxis`.
 - Exhibit stance (`for`/`against`) deliberately borrows no colour from the
   verdict ramp — it is told by its sign and weight, since an exhibit's side is
   not the run's verdict. Runs ingested before stances exist carry `""` and

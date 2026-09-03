@@ -17,19 +17,19 @@ export const PRIORITIES = ['high', 'medium', 'low']
 
 export const EFFORT_LABEL = { easy: 'A focused edit', medium: 'Several files', hard: 'Broad change' }
 
-/* The scale runs refuted → true. `at` is where a verdict sits on it, 0–1.
- * `uncertain` and `unverifiable` are deliberately off the scale: no position
- * on a truth axis is an honest place to put "nobody can tell". */
+/* The scale runs refuted → true; `ORDER` below is that ordering. `uncertain`
+ * and `unverifiable` are deliberately off the scale: no position on a truth
+ * axis is an honest place to put "nobody can tell". */
 export const STANDING = {
-  false: { name: 'False', at: 0.04, blurb: 'The agent found a counterexample.' },
-  mostly_false: { name: 'Mostly false', at: 0.26, blurb: 'A narrow part holds; the claim as written does not.' },
-  partly_true: { name: 'Partly true', at: 0.62, blurb: 'The substance holds, with exceptions worth naming.' },
-  true: { name: 'True', at: 0.97, blurb: 'True as stated, with no material exceptions.' },
-  uncertain: { name: 'No position', at: null, blurb: 'The evidence came back mixed.' },
-  unverifiable: { name: 'Off the scale', at: null, blurb: 'This cannot be settled from the code alone.' },
-  checking: { name: 'Checking', at: null, blurb: 'An agent is reading the code right now.' },
-  queued: { name: 'Queued', at: null, blurb: 'Waiting for an agent.' },
-  error: { name: 'No verdict', at: null, blurb: 'The run stopped before reaching a verdict.' },
+  false: { name: 'False', blurb: 'The agent found a counterexample.' },
+  mostly_false: { name: 'Mostly false', blurb: 'A narrow part holds; the claim as written does not.' },
+  partly_true: { name: 'Partly true', blurb: 'The substance holds, with exceptions worth naming.' },
+  true: { name: 'True', blurb: 'True as stated, with no material exceptions.' },
+  uncertain: { name: 'No position', blurb: 'The evidence came back mixed.' },
+  unverifiable: { name: 'Off the scale', blurb: 'This cannot be settled from the code alone.' },
+  checking: { name: 'Checking', blurb: 'An agent is reading the code right now.' },
+  queued: { name: 'Queued', blurb: 'Waiting for an agent.' },
+  error: { name: 'No verdict', blurb: 'The run stopped before reaching a verdict.' },
 }
 
 export const ORDER = [
@@ -76,26 +76,11 @@ export function Inline({ children }) {
   )
 }
 
-/** Where one claim stands, as a tick on the shared scale. Pass
- *  `track={false}` for a compact, name-only rendering. */
-export function Standing({ status, big, track = true }) {
+/** Where one claim stands, named. */
+export function Standing({ status, big }) {
   const s = STANDING[status] || STANDING.error
-  const searching = status === 'checking'
-  const hollow = !searching && s.at === null
   return (
     <span className={`standing ${big ? 'big' : ''}`} title={s.blurb}>
-      {track && (
-        <span className="standing-track">
-          <span
-            className={`standing-mark ${hollow ? 'hollow' : ''} ${searching ? 'searching' : ''}`}
-            style={
-              searching
-                ? undefined
-                : { left: `${(s.at === null ? 0.5 : s.at) * 100}%` }
-            }
-          />
-        </span>
-      )}
       <span className={`standing-name n-${status}`}>{s.name}</span>
     </span>
   )

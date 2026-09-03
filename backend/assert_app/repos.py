@@ -156,6 +156,56 @@ def remove_worktree(slug: str, branch: str) -> None:
     _git("worktree", "remove", "--force", str(wt), cwd=dest, check=False)
 
 
+def has_commits(slug: str, branch: str, base: str) -> bool:
+    wt = worktree_path(slug, branch)
+    if not wt.exists() or not base:
+        return False
+    r = _git("rev-list", "--count", f"{base}..HEAD", cwd=wt, check=False)
+    return r.stdout.strip().isdigit() and int(r.stdout.strip()) > 0
+
+
+def commit_all(slug: str, branch: str, message: str) -> bool:
+    """Commit any uncommitted work in the worktree. True if a commit was made.
+
+    Agents are asked to commit, but not all of them do; without this their
+    changes would be diffed into the UI yet never reach the pull request.
+    """
+    wt = worktree_path(slug, branch)
+    if not wt.exists():
+        return False
+    if not _git("status", "--porcelain", cwd=wt, check=False).stdout.strip():
+        return False
+    _git("add", "-A", cwd=wt, check=False)
+    r = _git("commit", "-m", message, cwd=wt, check=False)
+    if r.returncode != 0:
+        log.warning("commit in %s failed: %s", wt, r.stderr.strip())
+        return False
+    return True
+
+
+def push_branch(slug: str, branch: str, token: str) -> None:
+    """Push ``branch`` to origin using ``token``.
+
+    The token is passed through the URL of a one-shot push rather than being
+    written to the remote config, so it never lands on disk.
+    """
+    wt = worktree_path(slug, branch)
+    if not wt.exists():
+        raise RepoError(f"No worktree for {branch}")
+    origin = _git("remote", "get-url", "origin", cwd=wt).stdout.strip()
+    m = re.match(r"^https://(?:[^@/]+@)?(.+)$", origin)
+    if not m:
+        raise RepoError(f"Can only push https remotes, got {origin!r}")
+    authed = f"https://x-access-token:{token}@{m.group(1)}"
+
+    r = _git("push", "--force-with-lease", authed, f"{branch}:{branch}", cwd=wt, check=False)
+    if r.returncode != 0:
+        # Never surface the URL: it carries the token.
+        err = (r.stderr or "").replace(token, "***")
+        err = re.sub(r"https://[^\s]+", "<remote>", err).strip()
+        raise RepoError(err or "git push failed")
+
+
 def worktree_diff(slug: str, branch: str, base: str) -> str:
     """Unified diff from ``base`` to the worktree, including uncommitted work."""
     wt = worktree_path(slug, branch)

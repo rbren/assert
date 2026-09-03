@@ -9,8 +9,8 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from . import agent_client, repos
-from .config import DATA_DIR, MAX_ITERATIONS
+from . import agent_client, github, repos
+from .config import DATA_DIR, MAX_ITERATIONS, PR_DRAFT
 from .models import (
     CATEGORIES,
     DEFAULT_CATEGORY,
@@ -406,9 +406,92 @@ def ingest_remediation(db: Session, rem: Remediation) -> bool:
     )
     rem.finished_at = datetime.now(timezone.utc)
     db.commit()
+
+    if rem.status == "done":
+        _open_pull_request(db, rem, pr_title=str(data.get("pr_title") or "").strip())
+
     db.refresh(rem)
     log.info("remediation %s ingested: %s", rem.id, rem.status)
     return True
+
+
+def _pr_body(rem: Remediation) -> str:
+    a = rem.assertion
+    fix_title = rem.fix.title if rem.fix else ""
+    lines = [
+        "### Assertion",
+        "",
+        f"> {a.text or a.raw_text}",
+        "",
+    ]
+    if fix_title:
+        lines += [f"### Fix applied: {fix_title}", ""]
+    if rem.summary:
+        lines += [rem.summary, ""]
+    if rem.base_commit:
+        lines += [f"Branched from `{rem.base_commit[:10]}`.", ""]
+    lines += [
+        "---",
+        "",
+        "_This pull request was opened by an AI agent (OpenHands) on behalf of "
+        "@rbren, via [assert](https://github.com/rbren/assert), which checks "
+        "assertions about a codebase and proposes fixes when they do not hold. "
+        "Please review before merging._",
+    ]
+    return "\n".join(lines)
+
+
+def _open_pull_request(db: Session, rem: Remediation, *, pr_title: str) -> None:
+    """Push the remediation branch and open a PR for it.
+
+    Failures here are recorded on ``pr_error`` and deliberately do not fail the
+    remediation: the change still exists locally and its diff is worth showing.
+    """
+    project = rem.assertion.project
+    branch = rem.branch or ""
+    slug = project.slug
+
+    def fail(msg: str) -> None:
+        rem.pr_error = msg
+        db.commit()
+        log.warning("remediation %s: no PR: %s", rem.id, msg)
+
+    parsed = github.parse_repo(project.repo_url)
+    if not parsed:
+        return fail("Only github.com repositories can have pull requests opened.")
+    owner, repo = parsed
+
+    repos.commit_all(slug, branch, pr_title or f"assert: {rem.assertion.title}")
+    if not repos.has_commits(slug, branch, rem.base_commit or ""):
+        return fail("The agent left no commits on its branch, so there is nothing to open.")
+
+    ok, why = github.can_push(owner, repo)
+    if not ok:
+        return fail(why)
+
+    token = github.token()
+    try:
+        repos.push_branch(slug, branch, token)
+    except Exception as exc:
+        return fail(f"Could not push the branch: {exc}")
+
+    try:
+        url, number = github.open_pull_request(
+            owner=owner,
+            repo=repo,
+            head=branch,
+            base=project.default_branch or "main",
+            title=pr_title or f"assert: {rem.assertion.title or 'fix'}",
+            body=_pr_body(rem),
+            draft=PR_DRAFT,
+        )
+    except Exception as exc:
+        return fail(str(exc))
+
+    rem.pr_url = url
+    rem.pr_number = number
+    rem.pr_error = None
+    db.commit()
 
 
 def sync_remediation(db: Session, rem: Remediation) -> Remediation:

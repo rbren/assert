@@ -398,6 +398,9 @@ def discard_remediation(
     if rem is None:
         raise HTTPException(404, "Remediation not found")
     if rem.branch:
+        # Only the local worktree goes; a pushed branch and its pull request
+        # are left for the user to close on GitHub, since others may be
+        # reviewing them by now.
         repos.remove_worktree(rem.assertion.project.slug, rem.branch)
     db.delete(rem)
     db.commit()

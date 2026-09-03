@@ -5,7 +5,6 @@ import { api } from '../api'
 import {
   Attempt,
   CATEGORIES,
-  Chip,
   ExhibitList,
   FixList,
   Freshness,
@@ -16,81 +15,95 @@ import {
   Standing,
   statusOf,
 } from '../components.jsx'
+import { freshness, parseUTC, timeAgo } from '../freshness'
 
 const POLL_MS = 4000
 
-function EditForm({ assertion, onSave, onCancel, busy }) {
-  const [text, setText] = useState(assertion.text)
-  const [title, setTitle] = useState(assertion.title)
-  const [emoji, setEmoji] = useState(assertion.emoji)
-  const [category, setCategory] = useState(assertion.category)
-  const [priority, setPriority] = useState(assertion.priority)
+/* The claim grows to fit what you write, so the field never becomes a scrolling
+ * porthole onto your own sentence. */
+function useAutosize(ref, value) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [ref, value])
+}
 
-  const textChanged = text.trim() !== assertion.text
+/* The claim's own words. Editing happens in place — the field *is* the display
+ * text — but rewording is the one edit that throws away a verdict and starts a
+ * fresh agent run, so it is the one edit that asks first. Everything cheap
+ * around it saves silently on blur. */
+function ClaimEditor({ value, busy, onCommit }) {
+  const [draft, setDraft] = useState(value)
+  const ref = useRef(null)
+  useAutosize(ref, draft)
+  useEffect(() => setDraft(value), [value])
+
+  const changed = draft.trim() !== value && draft.trim() !== ''
 
   return (
-    <form
-      className="edit-form"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSave({ text: text.trim(), title, emoji, category, priority })
-      }}
-    >
-      <span className="label">Edit this claim</span>
-      <div className="row" style={{ marginTop: 12 }}>
-        <input
-          type="text"
-          className="emoji-input"
-          value={emoji}
-          maxLength={8}
-          aria-label="Emoji"
-          onChange={(e) => setEmoji(e.target.value)}
-        />
-        <input
-          type="text"
-          value={title}
-          maxLength={80}
-          placeholder="Short label"
-          aria-label="Title"
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <select value={category} onChange={(e) => setCategory(e.target.value)}>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <select value={priority} onChange={(e) => setPriority(e.target.value)}>
-          {PRIORITIES.map((p) => (
-            <option key={p} value={p}>
-              {p} priority
-            </option>
-          ))}
-        </select>
-      </div>
+    <div className={`claim-edit ${changed ? 'dirty' : ''}`}>
       <textarea
-        rows={3}
-        value={text}
+        ref={ref}
+        className="claim-field"
+        value={draft}
+        rows={1}
         aria-label="Claim"
-        onChange={(e) => setText(e.target.value)}
+        spellCheck="false"
+        disabled={busy}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setDraft(value)
+        }}
       />
-      <div className="compose-foot">
-        <span className="mono muted">
-          {textChanged
-            ? 'Rewording the claim starts a fresh check.'
-            : 'Your words are kept exactly as written.'}
-        </span>
-        <div className="row">
-          <button type="button" className="quiet" onClick={onCancel} disabled={busy}>
-            Cancel
-          </button>
-          <button className="primary" disabled={busy || !text.trim()}>
-            Save
-          </button>
+      {changed && (
+        <div className="claim-confirm">
+          <span className="mono muted">
+            Rewording discards this verdict and checks the new wording.
+          </span>
+          <div className="row">
+            <button type="button" className="link" onClick={() => setDraft(value)}>
+              revert
+            </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy}
+              onClick={() => onCommit(draft.trim())}
+            >
+              Reword &amp; re-check
+            </button>
+          </div>
         </div>
-      </div>
-    </form>
+      )}
+    </div>
+  )
+}
+
+/* Cheap metadata: no confirmation, no save button. It commits when you look
+ * away, the way a spreadsheet cell does. */
+function InlineField({ value, onCommit, className, maxLength, ariaLabel, placeholder }) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => setDraft(value), [value])
+  return (
+    <input
+      type="text"
+      className={`inline-field ${className || ''}`}
+      value={draft}
+      maxLength={maxLength}
+      aria-label={ariaLabel}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => draft !== value && onCommit(draft)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.target.blur()
+        if (e.key === 'Escape') {
+          setDraft(value)
+          e.target.blur()
+        }
+      }}
+    />
   )
 }
 
@@ -101,7 +114,6 @@ export default function AssertionPage() {
   const [attempts, setAttempts] = useState([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [editing, setEditing] = useState(false)
   const navigate = useNavigate()
   const timer = useRef(null)
 
@@ -163,6 +175,8 @@ export default function AssertionPage() {
   const history = runs.filter((r) => r.id !== run?.id)
   const settled = run?.status === 'done'
   const fixing = assertion.latest_remediation?.status === 'working'
+  const fresh = freshness(run)
+  const checkedAt = parseUTC(run?.finished_at || run?.created_at)
 
   return (
     <>
@@ -171,54 +185,80 @@ export default function AssertionPage() {
           ← back to the repository
         </Link>
 
-        {editing ? (
-          <EditForm
-            assertion={assertion}
-            busy={busy}
-            onCancel={() => setEditing(false)}
-            onSave={(patch) =>
-              act(async () => {
-                await api.updateAssertion(assertionId, patch)
-                setEditing(false)
-              })
-            }
+        <div className="row" style={{ gap: 6, alignItems: 'baseline' }}>
+          <InlineField
+            value={assertion.emoji}
+            className="emoji-field"
+            maxLength={8}
+            ariaLabel="Emoji"
+            onCommit={(emoji) => act(() => api.updateAssertion(assertionId, { emoji }))}
           />
-        ) : (
-          <>
-            <div className="row" style={{ gap: 14, alignItems: 'baseline' }}>
-              <span className="claim-emoji" aria-hidden="true">
-                {assertion.emoji}
-              </span>
-              <h1>{assertion.title || 'Claim'}</h1>
-            </div>
-            <div className="claim-statement">
-              <Md>{assertion.text}</Md>
-            </div>
-            {assertion.raw_text !== assertion.text && (
-              <p className="as-typed">As you typed it: “{assertion.raw_text}”</p>
-            )}
-            <div className="row wrap-row" style={{ gap: 8, marginTop: 18 }}>
-              <Chip>{assertion.category}</Chip>
-              <Chip className={assertion.priority}>{assertion.priority} priority</Chip>
-              <Freshness run={run} />
-            </div>
-            <div className="row wrap-row" style={{ marginTop: 20 }}>
-              <button
-                className="quiet"
-                disabled={busy || status === 'checking'}
-                onClick={() => act(() => api.reverify(assertionId))}
-              >
-                Check again at head
-              </button>
-              <button className="quiet" disabled={busy} onClick={() => setEditing(true)}>
-                Edit
-              </button>
-              <button className="quiet danger" disabled={busy} onClick={remove}>
-                Delete
-              </button>
-            </div>
-          </>
+          <InlineField
+            value={assertion.title}
+            className="title-field"
+            maxLength={80}
+            ariaLabel="Title"
+            placeholder="Untitled claim"
+            onCommit={(title) => act(() => api.updateAssertion(assertionId, { title }))}
+          />
+        </div>
+
+        <ClaimEditor
+          value={assertion.text}
+          busy={busy}
+          onCommit={(text) => act(() => api.updateAssertion(assertionId, { text }))}
+        />
+
+        {assertion.raw_text !== assertion.text && (
+          <p className="as-typed">As you typed it: “{assertion.raw_text}”</p>
         )}
+
+        <div className="row wrap-row claim-meta">
+          <select
+            className="chip-select"
+            value={assertion.category}
+            aria-label="Category"
+            onChange={(e) =>
+              act(() => api.updateAssertion(assertionId, { category: e.target.value }))
+            }
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <select
+            className={`chip-select p-${assertion.priority}`}
+            value={assertion.priority}
+            aria-label="Priority"
+            onChange={(e) =>
+              act(() => api.updateAssertion(assertionId, { priority: e.target.value }))
+            }
+          >
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {p} priority
+              </option>
+            ))}
+          </select>
+
+          {/* The recheck sits with the staleness reading rather than in a row of
+              buttons: the indicator states the problem, and the fix for it is
+              the next thing your eye lands on. */}
+          <span className="freshness-group">
+            <Freshness run={run} verbose />
+            <button
+              className="link recheck"
+              disabled={busy || status === 'checking' || status === 'queued'}
+              onClick={() => act(() => api.reverify(assertionId))}
+            >
+              {status === 'checking' || status === 'queued'
+                ? 'checking…'
+                : 're-check at head'}
+            </button>
+          </span>
+        </div>
         {error && <div className="error">{error}</div>}
       </section>
 
@@ -258,10 +298,24 @@ export default function AssertionPage() {
           </p>
           <dl>
             <dt>Commit</dt>
-            <dd>{run?.commit_sha ? run.commit_sha.slice(0, 12) : '—'}</dd>
+            <dd>
+              {run?.commit_sha ? run.commit_sha.slice(0, 12) : '—'}
+              {fresh && fresh.behind > 0 && (
+                <span className={`behind-note fresh-${fresh.level}`}>
+                  {fresh.behind} behind head
+                </span>
+              )}
+            </dd>
             <dt>Checked</dt>
             <dd>
-              {run?.created_at ? new Date(run.created_at + 'Z').toLocaleString() : '—'}
+              {checkedAt ? (
+                <>
+                  {timeAgo(checkedAt)}
+                  <span className="exact-date">{checkedAt.toLocaleString()}</span>
+                </>
+              ) : (
+                '—'
+              )}
             </dd>
             <dt>Exhibits</dt>
             <dd>{run?.evidence?.length ?? 0}</dd>
@@ -284,6 +338,20 @@ export default function AssertionPage() {
         </aside>
       </section>
 
+      {settled && run.fixes?.length > 0 && (
+        <section className="section">
+          <SectionHead
+            title="Proposed fixes"
+            note="an agent applies the one you pick and opens a pull request"
+          />
+          <FixList
+            fixes={run.fixes}
+            busy={busy || fixing}
+            onApply={(fixId) => act(() => api.remediate(assertionId, fixId))}
+          />
+        </section>
+      )}
+
       {settled && (
         <section className="section">
           <SectionHead
@@ -295,20 +363,6 @@ export default function AssertionPage() {
             }
           />
           <ExhibitList evidence={run.evidence} />
-        </section>
-      )}
-
-      {settled && run.fixes?.length > 0 && (
-        <section className="section">
-          <SectionHead
-            title="Ways to make it true"
-            note="an agent applies the one you pick, on its own branch"
-          />
-          <FixList
-            fixes={run.fixes}
-            busy={busy || fixing}
-            onApply={(fixId) => act(() => api.remediate(assertionId, fixId))}
-          />
         </section>
       )}
 
@@ -332,13 +386,22 @@ export default function AssertionPage() {
             <div key={r.id} className="history-row">
               <Standing status={r.status === 'done' ? r.verdict || 'uncertain' : 'error'} />
               <span className="mono">
-                {new Date(r.created_at + 'Z').toLocaleDateString()} @{' '}
+                {timeAgo(parseUTC(r.finished_at || r.created_at))} @{' '}
                 {(r.commit_sha || '').slice(0, 10)}
               </span>
             </div>
           ))}
         </section>
       )}
+
+      {/* Deleting is rare and irreversible. It lives past the end of everything
+          worth reading, as a line of text rather than a button competing with
+          the actions you actually came here for. */}
+      <footer className="claim-foot">
+        <button className="link danger" disabled={busy} onClick={remove}>
+          delete this claim and its evidence
+        </button>
+      </footer>
     </>
   )
 }

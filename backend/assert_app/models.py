@@ -235,6 +235,12 @@ class Remediation(Base):
     branch: Mapped[str | None] = mapped_column(String(200), default=None)
     base_commit: Mapped[str | None] = mapped_column(String(64), default=None)
     conversation_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    # The pull request opened from `branch`, once the work is pushed.
+    pr_url: Mapped[str | None] = mapped_column(String(500), default=None)
+    pr_number: Mapped[int | None] = mapped_column(Integer, default=None)
+    # Why no PR exists, when the change itself succeeded (no push rights,
+    # nothing to commit, …). Distinct from `error`, which fails the attempt.
+    pr_error: Mapped[str | None] = mapped_column(Text, default=None)
     error: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
@@ -242,6 +248,7 @@ class Remediation(Base):
     assertion: Mapped[Assertion] = relationship(
         "Assertion", back_populates="remediations"
     )
+    fix: Mapped["ProposedFix | None"] = relationship("ProposedFix")
 
 
 class Evidence(Base):

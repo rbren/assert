@@ -8,30 +8,60 @@
  *      Nothing decorative borrows it. */
 
 :root {
-  --paper: #e4e6e0;
-  --raised: #edeee9;
-  --sunk: #d9dcd4;
-  --ink: #191c19;
-  --ink-2: #4a5049;
-  --ink-3: #767c74;
-  --rule: #c9cdc4;
-  --rule-soft: #d8dbd3;
+  /* Dark ground. Not black: a cool slate that keeps the mineral cast of the
+     palette, so the verdict hues sit in the same family as the surface rather
+     than floating on a neutral void. Elevation reads as *more* light, so
+     --raised is lighter than --paper and --sunk is darker, same as on paper. */
+  --paper: #16191a;
+  --raised: #1e2224;
+  --sunk: #101314;
+  --ink: #e8eae6;
+  --ink-2: #a4aca8;
+  --ink-3: #757e7b;
+  --rule: #333a3b;
+  --rule-soft: #262c2e;
+  /* Structural dividers — the ones that ran full-bleed in near-black on paper.
+     Inverted to near-white they became the loudest thing on the page, so they
+     step down to a rule that still separates without shouting. */
+  --rule-strong: #4a5354;
 
-  /* The scale, refuted → holds. */
-  --refuted: #8e2c34;
-  --mostly-false: #b4573f;
-  --partly: #a8761e;
-  --holds: #14624a;
+  /* The scale, refuted → true.
+     These are NOT the light-mode values. Dark, saturated pigment reads as mud
+     on a dark ground — it recedes exactly where the design needs it to carry
+     meaning. Each hue is lifted in lightness and eased off in saturation so it
+     stays luminous against --paper while keeping its identity and its order. */
+  --refuted: #d4525c;
+  --mostly-false: #e07a52;
+  --partly: #d69a2c;
+  --holds: #3fae86;
   /* Off the scale: no position could honestly be taken. */
-  --unsettled: #5b4a93;
-  --waiting: #767c74;
+  --unsettled: #9b8ad4;
+  --waiting: #7b8582;
+
+  /* Text laid *on* a verdict colour. Near-black, because every scale colour is
+     now light enough that dark type is the legible choice on top of it. */
+  --on-verdict: #12100f;
+
+  /* Attention — how much a claim matters, which is a different question from
+     whether it is true. Azurite sits outside the refuted→true ramp on purpose,
+     so importance can never be misread as a verdict. */
+  --attention: #5aa6e8;
+  --attention-dim: #6f8698;
+  --attention-wash: rgba(90, 166, 232, 0.1);
+
+  /* Staleness of the evidence. Three states only, because the question is
+     "can I still trust this?" and the answer is yes / probably / no. */
+  --fresh: var(--holds);
+  --drifting: var(--partly);
+  --stale: var(--refuted);
 
   --display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
   --claim: 'Newsreader', ui-serif, Georgia, serif;
   --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --measure: 1180px;
-  --focus: #14624a;
+  --holds-bright: #4fd3a3;
+  --focus: var(--holds-bright);
 }
 
 *,
@@ -85,7 +115,7 @@ main.wrap {
 /* ─── Chrome ─────────────────────────────────────────────────────────── */
 
 header.top {
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule-strong);
   background: var(--paper);
   position: sticky;
   top: 0;
@@ -106,13 +136,13 @@ header.top .wrap {
   align-items: baseline;
   gap: 1px;
 }
-/* The wordmark carries the axis it names: refuted on the left, holds on the
+/* The wordmark carries the axis it names: refuted on the left, true on the
    right, and the claim itself sitting between them. */
 .brand-mark {
   display: inline-block;
   width: 34px;
   height: 9px;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--rule-strong);
   background: linear-gradient(
     to right,
     var(--refuted) 0 25%,
@@ -191,10 +221,16 @@ header.top .wrap {
 .md li {
   margin-bottom: 0.25em;
 }
-.md code {
+/* An identifier quoted inside a sentence, wherever that sentence appears —
+   markdown prose or the plain-text `Inline` renderer. */
+.md code,
+.claim-text code,
+
+.fix-toggle code {
   font-family: var(--mono);
   font-size: 0.82em;
   background: var(--sunk);
+  color: var(--ink);
   padding: 1px 4px;
 }
 .md.small {
@@ -211,6 +247,10 @@ textarea {
   color: inherit;
 }
 
+/* Outlines sit at --rule, not --ink: a near-white hairline around every button
+   glares on a dark ground, where the same border in near-black read as crisp
+   on paper. Hover lifts the surface instead of inverting it, for the same
+   reason — a white slab is a flash, not an affordance. */
 button {
   font-family: var(--mono);
   font-size: 11.5px;
@@ -218,44 +258,53 @@ button {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   background: transparent;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--rule);
+  color: var(--ink);
   padding: 8px 15px;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 button:hover:not(:disabled) {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--raised);
+  border-color: var(--ink-2);
 }
 button:disabled {
-  border-color: var(--rule);
+  border-color: var(--rule-soft);
   color: var(--ink-3);
   cursor: not-allowed;
 }
+/* The affirmative colour of the scale carries the primary action. In light
+   mode that job went to a solid ink slab; its dark counterpart is the accent,
+   not white, which would halate at this size. */
 button.primary {
-  background: var(--ink);
-  color: var(--paper);
-}
-button.primary:hover:not(:disabled) {
   background: var(--holds);
   border-color: var(--holds);
+  color: var(--on-verdict);
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--holds-bright);
+  border-color: var(--holds-bright);
+  color: var(--on-verdict);
 }
 button.primary:disabled {
   background: var(--rule-soft);
   border-color: var(--rule);
+  color: var(--ink-3);
 }
 button.quiet {
-  border-color: var(--rule);
+  border-color: var(--rule-soft);
   color: var(--ink-2);
 }
 button.quiet:hover:not(:disabled) {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--paper);
+  border-color: var(--rule);
+  background: var(--raised);
+  color: var(--ink);
 }
 button.danger:hover:not(:disabled) {
   background: var(--refuted);
   border-color: var(--refuted);
+  color: var(--on-verdict);
 }
 /* Text-only action, for destructive things that must not compete. */
 button.link {
@@ -270,9 +319,13 @@ button.link:hover:not(:disabled) {
   color: var(--refuted);
 }
 
-input[type='text'],
-textarea,
-select {
+/* Fields that live inside prose opt out of the boxed treatment entirely — see
+   "Editing in place". The :not() is load-bearing: `input[type=...]` outranks a
+   single class, so without it the boxed rule wins and every inline field
+   reverts to looking like a form. */
+input[type='text']:not(.inline-field),
+textarea:not(.claim-field),
+select:not(.chip-select) {
   background: var(--raised);
   border: 1px solid var(--rule);
   padding: 11px 13px;
@@ -285,22 +338,22 @@ textarea {
   line-height: 1.45;
   resize: vertical;
 }
-input[type='text'] {
+input[type='text']:not(.inline-field) {
   font-family: var(--mono);
   font-size: 13px;
 }
-select {
+select:not(.chip-select) {
   font-family: var(--mono);
   font-size: 11.5px;
   padding: 7px 9px;
   width: auto;
   cursor: pointer;
 }
-input:focus,
-textarea:focus,
-select:focus {
+input:not(.inline-field):focus,
+textarea:not(.claim-field):focus,
+select:not(.chip-select):focus {
   outline: none;
-  border-color: var(--ink);
+  border-color: var(--ink-2);
   background: var(--raised);
 }
 
@@ -328,13 +381,13 @@ select:focus {
 .axis-scale {
   display: flex;
   height: 34px;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--rule-strong);
   background: var(--raised);
   overflow: hidden;
 }
 .axis-seg {
   border: 0;
-  border-right: 1px solid rgba(25, 28, 25, 0.25);
+  border-right: 1px solid rgba(0, 0, 0, 0.3);
   padding: 0;
   height: 100%;
   font-family: var(--mono);
@@ -342,7 +395,7 @@ select:focus {
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
-  color: #f2f3ef;
+  color: var(--on-verdict);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -367,13 +420,16 @@ select:focus {
 .axis .axis-seg.s-queued,
 .axis .axis-seg.s-error { background-color: var(--waiting); }
 
+/* Segments are now light-on-dark, so emphasis is drawn with a *dark* ring —
+   hover faint, selection solid. A light ring would disappear into the segment
+   it is meant to outline. */
 .axis button.axis-seg:hover {
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
-  color: #fff;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.28);
+  color: var(--on-verdict);
 }
 .axis button.axis-seg.on {
-  box-shadow: inset 0 0 0 2px var(--ink);
-  color: #fff;
+  box-shadow: inset 0 0 0 3px var(--on-verdict);
+  color: var(--on-verdict);
 }
 /* Everything else dims when one segment is selected, so the filter reads as a
    filter rather than as a change of verdict. */
@@ -419,10 +475,11 @@ select:focus {
   font-size: 11px;
   color: var(--ink-2);
 }
+/* No outline: at 9px the lifted verdict colours are self-defining against the
+   dark ground, and a border this size would eat the swatch it outlines. */
 .legend-swatch {
   width: 9px;
   height: 9px;
-  border: 1px solid rgba(25, 28, 25, 0.4);
 }
 
 /* ─── Verdict marker ─────────────────────────────────────────────────── */
@@ -517,26 +574,71 @@ select:focus {
   padding: 2px 7px;
   white-space: nowrap;
 }
-.chip.stale {
-  border-color: var(--partly);
-  color: var(--partly);
+/* Evidence age. The dot carries the state at a glance; the words carry the two
+   measurements behind it. Green is quiet — being current is the expected case
+   and should not compete with anything. */
+.chip.fresh-fresh,
+.chip.fresh-drifting,
+.chip.fresh-stale {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
+.fresh-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.fresh-sep {
+  opacity: 0.5;
+}
+.chip.fresh-fresh {
+  color: var(--fresh);
+  border-color: color-mix(in srgb, var(--fresh) 45%, transparent);
+}
+.chip.fresh-drifting {
+  color: var(--drifting);
+  border-color: color-mix(in srgb, var(--drifting) 55%, transparent);
+}
+/* Both kinds of drift agree here, so this one is allowed to be loud. */
+.chip.fresh-stale {
+  color: var(--stale);
+  border-color: var(--stale);
+  background: color-mix(in srgb, var(--stale) 12%, transparent);
+  font-weight: 600;
+}
+
+/* Priority is colour-coded on its own hue — azurite, deliberately outside the
+   refuted→true ramp. Importance and truth are different questions, and a red
+   "high priority" next to a red "refuted" would read as one claim shouting
+   twice. Saturation drains as priority falls: bright, then steel, then no hue
+   at all. The word itself is always present, so colour is never the only
+   channel carrying the meaning. */
 .chip.high {
-  border-color: var(--ink);
-  color: var(--ink);
-  font-weight: 500;
+  border-color: var(--attention);
+  color: var(--attention);
+  background: var(--attention-wash);
+  font-weight: 600;
+}
+.chip.medium {
+  border-color: var(--attention-dim);
+  color: var(--attention-dim);
 }
 .chip.low {
   color: var(--ink-3);
   border-color: var(--rule-soft);
 }
-.chip.easy { border-color: var(--holds); color: var(--holds); }
-.chip.hard { border-color: var(--refuted); color: var(--refuted); }
+/* Effort is a third question again; it borrows neither ramp and is told by
+   weight alone. */
+.chip.easy { color: var(--ink-2); }
+.chip.hard { color: var(--ink); border-color: var(--ink-3); font-weight: 600; }
 
 /* ─── Home ───────────────────────────────────────────────────────────── */
 
 .hero {
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule-strong);
   padding: 78px 0 54px;
 }
 .hero h1 {
@@ -567,7 +669,7 @@ select:focus {
 }
 .hero-field {
   display: flex;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--rule-strong);
   background: var(--raised);
 }
 .hero-field input[type='text'] {
@@ -578,7 +680,7 @@ select:focus {
 }
 .hero-field button {
   border: 0;
-  border-left: 1px solid var(--ink);
+  border-left: 1px solid var(--rule-strong);
   flex: none;
 }
 .hero-hint {
@@ -631,7 +733,7 @@ select:focus {
 
 .project-head {
   padding: 40px 0 26px;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule-strong);
 }
 .project-head h1 {
   font-family: var(--claim);
@@ -659,7 +761,7 @@ select:focus {
 
 .compose {
   padding: 26px 0 30px;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule-strong);
 }
 .compose textarea {
   border-color: var(--ink);
@@ -690,7 +792,7 @@ select:focus {
 }
 
 .ledger {
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid var(--rule-strong);
 }
 .claim-row {
   display: grid;
@@ -750,28 +852,7 @@ select:focus {
 
 .claim-head {
   padding: 34px 0 28px;
-  border-bottom: 1px solid var(--ink);
-}
-.claim-head .claim-emoji {
-  font-size: 30px;
-}
-.claim-head h1 {
-  font-family: var(--claim);
-  font-size: 34px;
-  font-weight: 500;
-  letter-spacing: -0.025em;
-}
-.claim-statement {
-  font-family: var(--claim);
-  font-size: clamp(22px, 2.9vw, 30px);
-  line-height: 1.36;
-  letter-spacing: -0.015em;
-  max-width: 30ch;
-  margin: 20px 0 0;
-}
-.claim-statement .md {
-  font-size: inherit;
-  line-height: inherit;
+  border-bottom: 1px solid var(--rule-strong);
 }
 .as-typed {
   font-family: var(--claim);
@@ -912,6 +993,9 @@ select:focus {
 .exit-0 { color: var(--holds); }
 .exit-n { color: var(--refuted); }
 
+/* Command output is recessed rather than raised — on a dark ground a console
+   reads as a well you look into, and it separates machine transcript from the
+   surrounding prose more clearly than another raised panel would. */
 pre {
   margin: 0;
   padding: 12px 14px;
@@ -919,7 +1003,7 @@ pre {
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.62;
-  background: var(--raised);
+  background: var(--sunk);
   border: 1px solid var(--rule-soft);
   border-left: 2px solid var(--rule);
 }
@@ -985,7 +1069,7 @@ pre.blank {
 }
 
 .attempt {
-  border: 1px solid var(--ink);
+  border: 1px solid var(--rule-strong);
   padding: 18px;
   margin-top: 18px;
   background: var(--raised);
@@ -1003,6 +1087,37 @@ pre.blank {
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+/* The pull request is the payoff of a fix, so it reads as a destination
+   rather than another chip in the row. */
+.pr-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 9px 14px;
+  border: 1px solid var(--holds);
+  color: var(--holds);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+.pr-link:hover {
+  background: var(--holds);
+  color: var(--sunk);
+}
+.pr-mark {
+  font-size: 14px;
+}
+.pr-none {
+  margin-top: 12px;
+}
+.chip.pr-chip {
+  color: var(--holds);
+  border-color: var(--holds);
+  text-decoration: none;
+}
+
 details.diff {
   margin-top: 14px;
 }
@@ -1032,24 +1147,174 @@ details.diff pre {
   color: var(--ink-3);
 }
 
-.edit-form {
-  padding: 26px 0;
-  border-bottom: 1px solid var(--ink);
+/* ─── Editing in place ───────────────────────────────────────────────── */
+
+/* There is no edit mode. Every field on a claim is already the input for that
+   field — it just doesn't dress like one until you approach it. The affordance
+   is a wash and a rule that fade in on hover, which is enough to say "this
+   responds" without turning a page of prose into a form. */
+.inline-field,
+.claim-field {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  padding: 2px 6px;
+  margin-left: -6px;
+  width: 100%;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
 }
-.edit-form .row {
-  margin-bottom: 12px;
-  flex-wrap: wrap;
+.inline-field:hover:not(:focus),
+.claim-field:hover:not(:focus) {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
 }
-.edit-form input[type='text'] {
-  width: auto;
+.inline-field:focus,
+.claim-field:focus {
+  outline: none;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.inline-field::placeholder,
+.claim-field::placeholder {
+  color: var(--ink-3);
+}
+
+.title-field {
+  font-family: var(--claim);
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
 }
-.emoji-input {
-  width: 62px !important;
-  flex: none !important;
+.emoji-field {
+  font-size: 30px;
+  width: 1.9em;
+  flex: none;
   text-align: center;
-  font-size: 17px !important;
+  margin-left: 0;
+}
+
+.claim-edit {
+  margin: 18px 0 0;
+  max-width: 34ch;
+}
+.claim-field {
+  font-family: var(--claim);
+  font-size: clamp(22px, 2.9vw, 30px);
+  line-height: 1.36;
+  letter-spacing: -0.015em;
+  resize: none;
+  overflow: hidden;
+  display: block;
+}
+/* The claim is the one field whose edit costs a verdict, so while it is dirty
+   it is marked as unsettled rather than saved-in-place like the rest. */
+.claim-edit.dirty .claim-field {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--drifting);
+}
+.claim-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-left: 6px;
+}
+.claim-confirm .mono {
+  font-size: 11.5px;
+  max-width: 34ch;
+}
+
+.claim-meta {
+  gap: 8px;
+  margin-top: 20px;
+  align-items: center;
+}
+
+/* A select that reads as one of the chips beside it, so changing category or
+   priority is the same gesture as reading it. */
+.chip-select {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--rule);
+  padding: 2px 7px;
+  width: auto;
+  cursor: pointer;
+  appearance: none;
+}
+.chip-select:hover {
+  border-color: var(--ink-3);
+  background: var(--raised);
+}
+.chip-select.p-high {
+  border-color: var(--attention);
+  color: var(--attention);
+  background: var(--attention-wash);
+  font-weight: 600;
+}
+.chip-select.p-medium {
+  border-color: var(--attention-dim);
+  color: var(--attention-dim);
+}
+.chip-select.p-low {
+  color: var(--ink-3);
+  border-color: var(--rule-soft);
+}
+
+/* The staleness reading and the button that resolves it are one unit. */
+.freshness-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.recheck {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  text-transform: none;
+}
+.recheck:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+/* The sidebar states the commit and how far past it the repo has moved, on the
+   same line, because "checked at a4aca9" is only meaningful next to how much
+   has landed since. */
+.behind-note {
+  display: block;
+  font-size: 10.5px;
+  margin-top: 3px;
+}
+.behind-note.fresh-drifting { color: var(--drifting); }
+.behind-note.fresh-stale { color: var(--stale); font-weight: 600; }
+.exact-date {
+  display: block;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.claim-foot {
+  border-top: 1px solid var(--rule-soft);
+  margin-top: 56px;
+  padding: 20px 0 60px;
+}
+.claim-foot .link {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: none;
+  letter-spacing: 0.04em;
 }
 
 /* ─── Motion ─────────────────────────────────────────────────────────── */

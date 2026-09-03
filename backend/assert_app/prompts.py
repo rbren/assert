@@ -195,19 +195,23 @@ grander version of it.
 
 ## The codebase
 
-The repository is checked out at `{checkout_dir}`, on a scratch branch named \
-`{branch}` created for this work. You may edit files freely — you are on a \
-throwaway branch and nothing is pushed.
+The repository is checked out at `{checkout_dir}`, on a branch named \
+`{branch}` created for this work.
+
+**Your commits on this branch will be pushed and opened as a pull request** \
+against the repository's default branch. Write them for a human reviewer.
 
 Rules:
-- Stay on `{branch}`. Do not switch branches, do not rebase, do not touch any \
-remote, do not push anything anywhere.
+- Stay on `{branch}`. Do not switch branches, do not rebase, and do not push \
+or otherwise touch the remote yourself — that is handled for you once you \
+finish.
 - Make the **smallest change** that makes the assertion true. No drive-by \
 refactors, no reformatting untouched code, no unrelated dependency bumps.
 - Follow the conventions already in the codebase.
 - If the repo has tests covering what you touched, run them and make sure they \
 pass.
-- Commit your work to `{branch}` when you are done. One commit is fine.
+- Commit your work to `{branch}` when you are done. One commit is fine. Use a \
+clear commit message written in the imperative mood.
 
 If the plan turns out to be wrong or impossible, do the sensible thing instead \
 and explain the divergence — do not force through a change you believe is bad.
@@ -219,6 +223,7 @@ Write a JSON summary to `{report_path}` (create parent directories if needed):
 ```json
 {{
   "status": "done | blocked",
+  "pr_title": "Imperative one-line pull request title, under 70 characters.",
   "summary": "What you changed and why it makes the assertion true. Markdown, 2-4 sentences."
 }}
 ```
@@ -226,6 +231,9 @@ Write a JSON summary to `{report_path}` (create parent directories if needed):
 Use `blocked` if you could not make the assertion true, and say what stopped \
 you in `summary`. Be concise; the diff is shown alongside this, so do not \
 restate it line by line.
+
+`summary` becomes the body of the pull request, so write it for a reviewer \
+who has not seen this task.
 
 When the report is written, stop. Do not ask follow-up questions.\
 """

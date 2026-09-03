@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Markdown from 'react-markdown'
+import { freshness, timeAgo } from './freshness'
 
 export const CATEGORIES = [
   'docs',
@@ -15,14 +16,14 @@ export const PRIORITIES = ['high', 'medium', 'low']
 
 export const EFFORT_LABEL = { easy: 'A focused edit', medium: 'Several files', hard: 'Broad change' }
 
-/* The scale runs refuted → holds. `at` is where a verdict sits on it, 0–1.
+/* The scale runs refuted → true. `at` is where a verdict sits on it, 0–1.
  * `uncertain` and `unverifiable` are deliberately off the scale: no position
  * on a truth axis is an honest place to put "nobody can tell". */
 export const STANDING = {
   false: { name: 'Refuted', at: 0.04, blurb: 'The agent found a counterexample.' },
   mostly_false: { name: 'Mostly false', at: 0.26, blurb: 'A narrow part holds; the claim as written does not.' },
   partly_true: { name: 'Partly true', at: 0.62, blurb: 'The substance holds, with exceptions worth naming.' },
-  true: { name: 'Holds', at: 0.97, blurb: 'Holds as stated, with no material exceptions.' },
+  true: { name: 'True', at: 0.97, blurb: 'True as stated, with no material exceptions.' },
   uncertain: { name: 'No position', at: null, blurb: 'The evidence came back mixed.' },
   unverifiable: { name: 'Off the scale', at: null, blurb: 'This cannot be settled from the code alone.' },
   checking: { name: 'Checking', at: null, blurb: 'An agent is reading the code right now.' },
@@ -127,7 +128,7 @@ export function StandingAxis({ counts, total, selected, onSelect, ends = true })
       {ends && (
         <div className="axis-ends">
           <span>refuted</span>
-          <span>holds</span>
+          <span>true</span>
         </div>
       )}
     </div>
@@ -158,18 +159,39 @@ export function tally(assertions) {
   return counts
 }
 
-export function Chip({ children, className }) {
-  return <span className={`chip ${className || ''}`}>{children}</span>
+export function Chip({ children, className, title }) {
+  return (
+    <span className={`chip ${className || ''}`} title={title}>
+      {children}
+    </span>
+  )
 }
 
-/** How far the checkout has moved since the evidence was gathered. */
-export function Freshness({ run }) {
-  if (!run || run.commits_behind == null) return null
-  const n = run.commits_behind
-  if (n === 0) return <Chip>checked at head</Chip>
+export function Freshness({ run, verbose }) {
+  const f = freshness(run)
+  if (!f) return null
+  const when = timeAgo(f.checked)
+  const commits =
+    f.behind === 0
+      ? 'at head'
+      : `${f.behind} commit${f.behind === 1 ? '' : 's'} behind`
   return (
-    <Chip className="stale">
-      {n} commit{n === 1 ? '' : 's'} since
+    <Chip
+      className={`fresh-${f.level}`}
+      title={
+        f.checked
+          ? `Checked ${f.checked.toLocaleString()} — ${commits}`
+          : undefined
+      }
+    >
+      <span className="fresh-dot" aria-hidden="true" />
+      {commits}
+      {when && (
+        <>
+          <span className="fresh-sep">·</span>
+          {verbose ? `checked ${when}` : when}
+        </>
+      )}
     </Chip>
   )
 }
@@ -315,6 +337,15 @@ export function Attempt({ remediation: r, onDiscard }) {
       </div>
       {r.error && <div className="error">{r.error}</div>}
       <Md className="small">{r.summary}</Md>
+      {r.pr_url && (
+        <a className="pr-link" href={r.pr_url} target="_blank" rel="noreferrer">
+          <span className="pr-mark">⑂</span>
+          View pull request #{r.pr_number} ↗
+        </a>
+      )}
+      {r.pr_error && (
+        <p className="muted small pr-none">No pull request: {r.pr_error}</p>
+      )}
       {r.diff && (
         <details className="diff">
           <summary>Read the diff</summary>

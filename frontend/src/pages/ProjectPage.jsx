@@ -57,6 +57,16 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
               <span className="spinner" /> fixing
             </Chip>
           )}
+          {a.latest_remediation?.pr_url && (
+            <a
+              className="chip pr-chip"
+              href={a.latest_remediation.pr_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              ⑂ PR #{a.latest_remediation.pr_number}
+            </a>
+          )}
         </div>
       </div>
       <div className="claim-standing">

@@ -16,6 +16,9 @@ ADD_COLUMNS = [
     ("assertions", "category", "TEXT NOT NULL DEFAULT 'quality'"),
     ("assertions", "priority", "TEXT NOT NULL DEFAULT 'medium'"),
     ("remediations", "fix_id", "INTEGER REFERENCES proposed_fixes(id)"),
+    ("remediations", "pr_url", "VARCHAR(500)"),
+    ("remediations", "pr_number", "INTEGER"),
+    ("remediations", "pr_error", "TEXT"),
 ]
 
 CREATE_PROPOSED_FIXES = """

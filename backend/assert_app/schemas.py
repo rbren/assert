@@ -89,6 +89,9 @@ class RemediationOut(BaseModel):
     branch: str | None
     base_commit: str | None
     conversation_id: str | None
+    pr_url: str | None
+    pr_number: int | None
+    pr_error: str | None
     error: str | None
     created_at: datetime
     finished_at: datetime | None

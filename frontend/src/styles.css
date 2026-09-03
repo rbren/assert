@@ -725,6 +725,44 @@ select:not(.chip-select):focus {
   flex-wrap: wrap;
 }
 
+/* Prompts, not verdicts: the summary wears the same mono label as every other
+   disclosure, and the suggestions themselves speak in the claim voice — they
+   are claims-to-be, so they dress like claims. */
+details.suggestions {
+  margin-top: 12px;
+}
+details.suggestions summary {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 6px 0;
+}
+details.suggestions summary:hover {
+  color: var(--ink);
+}
+details.suggestions ul {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+}
+details.suggestions button {
+  border: 0;
+  padding: 4px 0;
+  font-family: var(--claim);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: var(--ink-2);
+}
+details.suggestions button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;

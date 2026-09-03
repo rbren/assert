@@ -20,6 +20,14 @@ import {
 
 const POLL_MS = 4000
 
+const SUGGESTIONS = [
+  'Test coverage is > 80%',
+  'There are no critical or high CVEs',
+  'All tests are run in CI/CD',
+  'Deployment process is automated and conforms to semver',
+  'AGENTS.md exists, conforms to best practices, and is up to date',
+]
+
 const SORTS = {
   standing: { label: 'Standing', key: statusRank },
   priority: { label: 'Priority', key: priorityRank },
@@ -286,6 +294,18 @@ export default function ProjectPage() {
             </button>
           </div>
         </form>
+        <details className="suggestions">
+          <summary>Suggested assertions</summary>
+          <ul>
+            {SUGGESTIONS.map((s) => (
+              <li key={s}>
+                <button type="button" disabled={!ready || busy} onClick={() => setText(s)}>
+                  {s}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
         {!ready && project.clone_status === 'cloning' && (
           <p className="mono muted" style={{ marginTop: 10 }}>
             <span className="spinner" /> Waiting for the clone to finish.

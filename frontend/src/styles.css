@@ -42,12 +42,12 @@
      now light enough that dark type is the legible choice on top of it. */
   --on-verdict: #12100f;
 
-  /* Attention — how much a claim matters, which is a different question from
-     whether it is true. Azurite sits outside the refuted→true ramp on purpose,
-     so importance can never be misread as a verdict. */
-  --attention: #5aa6e8;
-  --attention-dim: #6f8698;
-  --attention-wash: rgba(90, 166, 232, 0.1);
+  /* Priority — red / yellow / blue for high / medium / low. Own tokens, not
+     aliases of the verdict ramp, so the two scales can drift independently. */
+  --pri-high: #d4525c;
+  --pri-high-wash: rgba(212, 82, 92, 0.1);
+  --pri-medium: #d69a2c;
+  --pri-low: #5aa6e8;
 
   /* Staleness of the evidence — deliberately NOT aliased to the verdict ramp
      even though the hues are neighbours. These answer "can I still trust this
@@ -612,25 +612,22 @@ select:not(.chip-select):focus {
   background: var(--stale);
 }
 
-/* Priority is colour-coded on its own hue — azurite, deliberately outside the
-   refuted→true ramp. Importance and truth are different questions, and a red
-   "high priority" next to a red "refuted" would read as one claim shouting
-   twice. Saturation drains as priority falls: bright, then steel, then no hue
-   at all. The word itself is always present, so colour is never the only
-   channel carrying the meaning. */
+/* Priority is colour-coded red / yellow / blue for high / medium / low. The
+   word itself is always present, so colour is never the only channel carrying
+   the meaning. */
 .chip.high {
-  border-color: var(--attention);
-  color: var(--attention);
-  background: var(--attention-wash);
+  border-color: var(--pri-high);
+  color: var(--pri-high);
+  background: var(--pri-high-wash);
   font-weight: 600;
 }
 .chip.medium {
-  border-color: var(--attention-dim);
-  color: var(--attention-dim);
+  border-color: var(--pri-medium);
+  color: var(--pri-medium);
 }
 .chip.low {
-  color: var(--ink-3);
-  border-color: var(--rule-soft);
+  color: var(--pri-low);
+  border-color: var(--pri-low);
 }
 /* Effort is a third question again; it borrows neither ramp and is told by
    weight alone. */
@@ -798,7 +795,7 @@ select:not(.chip-select):focus {
 }
 .claim-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 210px 150px;
+  grid-template-columns: 30px minmax(0, 1fr) 232px 150px;
   gap: 20px;
   align-items: start;
   padding: 20px 0;
@@ -835,12 +832,17 @@ select:not(.chip-select):focus {
   margin-top: 9px;
   flex-wrap: wrap;
 }
+/* Priority | standing as two fixed columns, so the words line up row to row
+   like a table. */
 .claim-standing {
   padding-top: 2px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 112px auto;
+  gap: 10px;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+}
+.claim-standing .chip {
+  text-align: center;
 }
 .claim-actions {
   display: flex;
@@ -1297,18 +1299,18 @@ details.diff pre {
   background: var(--raised);
 }
 .chip-select.p-high {
-  border-color: var(--attention);
-  color: var(--attention);
-  background: var(--attention-wash);
+  border-color: var(--pri-high);
+  color: var(--pri-high);
+  background: var(--pri-high-wash);
   font-weight: 600;
 }
 .chip-select.p-medium {
-  border-color: var(--attention-dim);
-  color: var(--attention-dim);
+  border-color: var(--pri-medium);
+  color: var(--pri-medium);
 }
 .chip-select.p-low {
-  color: var(--ink-3);
-  border-color: var(--rule-soft);
+  color: var(--pri-low);
+  border-color: var(--pri-low);
 }
 
 /* The staleness reading and the button that resolves it are one unit. */

@@ -69,8 +69,8 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
         </div>
       </div>
       <div className="claim-standing">
-        <Standing status={status} track={false} />
         <Chip className={a.priority}>{a.priority} priority</Chip>
+        <Standing status={status} track={false} />
       </div>
       <div className="claim-actions">
         <button
@@ -142,14 +142,18 @@ export default function ProjectPage() {
         (priorityFilter === 'all' || a.priority === priorityFilter),
     )
     const keyOf = SORTS[sortBy].key
-    // Standing breaks every other tie, so equal rows still lead with whatever
-    // is most in need of attention.
+    // Standing, then priority, break every other tie — so sorting by standing
+    // leads each verdict group with its highest-priority claims.
     return [...rows].sort((x, y) => {
       const kx = keyOf(x)
       const ky = keyOf(y)
       if (kx < ky) return -1
       if (kx > ky) return 1
-      return statusRank(x) - statusRank(y) || y.id - x.id
+      return (
+        statusRank(x) - statusRank(y) ||
+        priorityRank(x) - priorityRank(y) ||
+        y.id - x.id
+      )
     })
   }, [project, sortBy, standingFilter, categoryFilter, priorityFilter])
 

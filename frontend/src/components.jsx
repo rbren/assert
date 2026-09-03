@@ -21,7 +21,7 @@ export const EFFORT_LABEL = { easy: 'A focused edit', medium: 'Several files', h
  * `uncertain` and `unverifiable` are deliberately off the scale: no position
  * on a truth axis is an honest place to put "nobody can tell". */
 export const STANDING = {
-  false: { name: 'Refuted', at: 0.04, blurb: 'The agent found a counterexample.' },
+  false: { name: 'False', at: 0.04, blurb: 'The agent found a counterexample.' },
   mostly_false: { name: 'Mostly false', at: 0.26, blurb: 'A narrow part holds; the claim as written does not.' },
   partly_true: { name: 'Partly true', at: 0.62, blurb: 'The substance holds, with exceptions worth naming.' },
   true: { name: 'True', at: 0.97, blurb: 'True as stated, with no material exceptions.' },
@@ -76,23 +76,26 @@ export function Inline({ children }) {
   )
 }
 
-/** Where one claim stands, as a tick on the shared scale. */
-export function Standing({ status, big }) {
+/** Where one claim stands, as a tick on the shared scale. Pass
+ *  `track={false}` for a compact, name-only rendering. */
+export function Standing({ status, big, track = true }) {
   const s = STANDING[status] || STANDING.error
   const searching = status === 'checking'
   const hollow = !searching && s.at === null
   return (
     <span className={`standing ${big ? 'big' : ''}`} title={s.blurb}>
-      <span className="standing-track">
-        <span
-          className={`standing-mark ${hollow ? 'hollow' : ''} ${searching ? 'searching' : ''}`}
-          style={
-            searching
-              ? undefined
-              : { left: `${(s.at === null ? 0.5 : s.at) * 100}%` }
-          }
-        />
-      </span>
+      {track && (
+        <span className="standing-track">
+          <span
+            className={`standing-mark ${hollow ? 'hollow' : ''} ${searching ? 'searching' : ''}`}
+            style={
+              searching
+                ? undefined
+                : { left: `${(s.at === null ? 0.5 : s.at) * 100}%` }
+            }
+          />
+        </span>
+      )}
       <span className={`standing-name n-${status}`}>{s.name}</span>
     </span>
   )
@@ -128,7 +131,7 @@ export function StandingAxis({ counts, total, selected, onSelect, ends = true })
       </div>
       {ends && (
         <div className="axis-ends">
-          <span>refuted</span>
+          <span>false</span>
           <span>true</span>
         </div>
       )}

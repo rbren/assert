@@ -50,7 +50,6 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
         </Link>
         <div className="claim-tags">
           <Chip>{a.category}</Chip>
-          <Chip className={a.priority}>{a.priority} priority</Chip>
           <Freshness run={run} />
           {fixing && (
             <Chip>
@@ -70,7 +69,8 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
         </div>
       </div>
       <div className="claim-standing">
-        <Standing status={status} />
+        <Standing status={status} track={false} />
+        <Chip className={a.priority}>{a.priority} priority</Chip>
       </div>
       <div className="claim-actions">
         <button

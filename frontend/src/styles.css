@@ -837,6 +837,10 @@ select:not(.chip-select):focus {
 }
 .claim-standing {
   padding-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .claim-actions {
   display: flex;

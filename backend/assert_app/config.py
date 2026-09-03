@@ -18,6 +18,7 @@ def _default_repo_root() -> Path:
 REPO_ROOT: Path = Path(os.environ.get("ASSERT_REPO_ROOT", _default_repo_root()))
 DATA_DIR: Path = Path(os.environ.get("ASSERT_DATA_ROOT", REPO_ROOT / "data"))
 CHECKOUTS_DIR: Path = DATA_DIR / "checkouts"
+WORKTREES_DIR: Path = DATA_DIR / "worktrees"
 
 DB_PATH: Path = DATA_DIR / "assert.db"
 DB_URL: str = f"sqlite:///{DB_PATH}"
@@ -42,5 +43,5 @@ CORS_ORIGINS: list[str] = [
 
 
 def ensure_dirs() -> None:
-    for d in (DATA_DIR, CHECKOUTS_DIR):
+    for d in (DATA_DIR, CHECKOUTS_DIR, WORKTREES_DIR):
         d.mkdir(parents=True, exist_ok=True)

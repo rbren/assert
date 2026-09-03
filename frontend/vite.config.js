@@ -8,4 +8,9 @@ export default defineConfig({
       '/api': 'http://127.0.0.1:18400',
     },
   },
+  preview: {
+    proxy: {
+      '/api': 'http://127.0.0.1:18400',
+    },
+  },
 })

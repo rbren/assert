@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .config import CHECKOUTS_DIR
+from .config import CHECKOUTS_DIR, WORKTREES_DIR
 
 log = logging.getLogger(__name__)
 
@@ -111,6 +111,60 @@ def head_sha(slug: str) -> str | None:
         return None
     r = _git("rev-parse", "HEAD", cwd=dest, check=False)
     return r.stdout.strip() or None
+
+
+def commits_since(slug: str, sha: str) -> int | None:
+    """How many commits HEAD is ahead of ``sha``.
+
+    ``None`` when the commit is unknown to the checkout (e.g. it was
+    force-pushed away), which is different from 0 — "up to date".
+    """
+    dest = checkout_path(slug)
+    if not (dest / ".git").exists() or not sha:
+        return None
+    r = _git("rev-list", "--count", f"{sha}..HEAD", cwd=dest, check=False)
+    if r.returncode != 0:
+        return None
+    out = r.stdout.strip()
+    return int(out) if out.isdigit() else None
+
+
+def worktree_path(slug: str, branch: str) -> Path:
+    return WORKTREES_DIR / slug / branch.replace("/", "-")
+
+
+def create_worktree(slug: str, branch: str) -> Path:
+    """Add a worktree on a new branch at HEAD.
+
+    Remediation runs in its own worktree so the primary checkout stays on the
+    default branch and remains valid for concurrent verification runs.
+    """
+    dest = checkout_path(slug)
+    if not (dest / ".git").exists():
+        raise RuntimeError(f"No checkout for {slug}")
+    wt = worktree_path(slug, branch)
+    if wt.exists():
+        remove_worktree(slug, branch)
+    wt.parent.mkdir(parents=True, exist_ok=True)
+    _git("worktree", "add", "-B", branch, str(wt), "HEAD", cwd=dest)
+    return wt
+
+
+def remove_worktree(slug: str, branch: str) -> None:
+    dest = checkout_path(slug)
+    wt = worktree_path(slug, branch)
+    _git("worktree", "remove", "--force", str(wt), cwd=dest, check=False)
+
+
+def worktree_diff(slug: str, branch: str, base: str) -> str:
+    """Unified diff from ``base`` to the worktree, including uncommitted work."""
+    wt = worktree_path(slug, branch)
+    if not wt.exists() or not base:
+        return ""
+    # Diff the working tree (not just commits) so an agent that edited without
+    # committing still has its work captured.
+    r = _git("diff", base, cwd=wt, check=False)
+    return r.stdout
 
 
 def read_file_lines(

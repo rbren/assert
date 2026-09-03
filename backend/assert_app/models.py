@@ -44,6 +44,21 @@ class Project(Base):
     )
 
 
+CATEGORIES: set[str] = {
+    "docs",
+    "tests",
+    "quality",
+    "code health",
+    "security",
+    "logic",
+    "api",
+}
+DEFAULT_CATEGORY = "quality"
+
+PRIORITIES: set[str] = {"high", "medium", "low"}
+DEFAULT_PRIORITY = "medium"
+
+
 class Assertion(Base):
     """A claim about the codebase, plus its most recent verification run."""
 
@@ -55,8 +70,14 @@ class Assertion(Base):
     )
     # Exactly what the user typed.
     raw_text: Mapped[str] = mapped_column(Text, default="")
-    # LLM-tidied version of raw_text — same meaning, cleaner prose.
+    # LLM-tidied version of raw_text — same meaning, cleaner prose. Markdown.
     text: Mapped[str] = mapped_column(Text, default="")
+    # Two-word label plus a single emoji, for scanning the list.
+    title: Mapped[str] = mapped_column(String(80), default="")
+    emoji: Mapped[str] = mapped_column(String(16), default="")
+    category: Mapped[str] = mapped_column(String(20), default=DEFAULT_CATEGORY)
+    # User-controlled; the LLM never sets this.
+    priority: Mapped[str] = mapped_column(String(10), default=DEFAULT_PRIORITY)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=utcnow, onupdate=utcnow
@@ -69,10 +90,37 @@ class Assertion(Base):
         cascade="all, delete-orphan",
         order_by="Run.created_at.desc()",
     )
+    remediations: Mapped[list["Remediation"]] = relationship(
+        "Remediation",
+        back_populates="assertion",
+        cascade="all, delete-orphan",
+        order_by="Remediation.created_at.desc()",
+    )
 
     @property
     def latest_run(self) -> "Run | None":
         return self.runs[0] if self.runs else None
+
+    @property
+    def latest_remediation(self) -> "Remediation | None":
+        return self.remediations[0] if self.remediations else None
+
+    @property
+    def status_rank(self) -> int:
+        """Sort key: things needing attention first, settled truths last."""
+        run = self.latest_run
+        if run is None or run.status in {"tidying", "investigating"}:
+            return 0
+        if run.status == "error":
+            return 1
+        return {
+            "false": 2,
+            "mostly_false": 3,
+            "partly_true": 4,
+            "uncertain": 5,
+            "unverifiable": 6,
+            "true": 7,
+        }.get(run.verdict or "", 5)
 
 
 class Run(Base):
@@ -88,11 +136,9 @@ class Run(Base):
     status: Mapped[str] = mapped_column(String(20), default="tidying")
     # "true" | "false" | "partly_true" | "unverifiable" (set when status=done)
     verdict: Mapped[str | None] = mapped_column(String(20), default=None)
-    # Why the evidence below supports the verdict.
+    # Why the evidence below supports the verdict. Markdown.
     summary: Mapped[str] = mapped_column(Text, default="")
-    # A sharper restatement of the assertion, with nuance/exceptions folded in.
-    suggested_text: Mapped[str] = mapped_column(Text, default="")
-    # Caveats/exceptions worth surfacing separately from the restatement.
+    # Exceptions, ambiguities, and scope limits. Markdown.
     caveats: Mapped[str] = mapped_column(Text, default="")
     # The commit the evidence was gathered against — the whole point of a run.
     commit_sha: Mapped[str | None] = mapped_column(String(64), default=None)
@@ -107,6 +153,79 @@ class Run(Base):
         back_populates="run",
         cascade="all, delete-orphan",
         order_by="Evidence.position",
+    )
+    fixes: Mapped[list["ProposedFix"]] = relationship(
+        "ProposedFix",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="ProposedFix.position",
+    )
+
+
+EFFORTS: set[str] = {"easy", "medium", "hard"}
+
+
+class ProposedFix(Base):
+    """One candidate way to make the assertion true.
+
+    A run proposes up to five, split so the user can pick by cost and odds —
+    a quick partial fix versus a thorough risky one.
+    """
+
+    __tablename__ = "proposed_fixes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    # Short imperative label, e.g. "Add return types to the API layer".
+    title: Mapped[str] = mapped_column(String(200), default="")
+    # The work order handed to a remediation agent. Markdown.
+    plan: Mapped[str] = mapped_column(Text, default="")
+    # "easy" | "medium" | "hard"
+    effort: Mapped[str] = mapped_column(String(10), default="medium")
+    # 0-100: the agent's confidence this fix actually lands.
+    confidence: Mapped[int | None] = mapped_column(Integer, default=None)
+    # What this fix does and does not achieve. Markdown.
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+    run: Mapped[Run] = relationship("Run", back_populates="fixes")
+
+
+class Remediation(Base):
+    """An agent attempt to change the codebase so the assertion becomes true."""
+
+    __tablename__ = "remediations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    assertion_id: Mapped[int] = mapped_column(
+        ForeignKey("assertions.id", ondelete="CASCADE"), index=True
+    )
+    # The run whose fix list this came from.
+    run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("runs.id", ondelete="SET NULL"), default=None
+    )
+    # The specific fix being attempted.
+    fix_id: Mapped[int | None] = mapped_column(
+        ForeignKey("proposed_fixes.id", ondelete="SET NULL"), default=None
+    )
+    # "working" | "done" | "error"
+    status: Mapped[str] = mapped_column(String(20), default="working")
+    # The agent's account of what it changed. Markdown.
+    summary: Mapped[str] = mapped_column(Text, default="")
+    # Unified diff of the work, so it can be reviewed without leaving the app.
+    diff: Mapped[str] = mapped_column(Text, default="")
+    # Scratch branch in the checkout holding the changes.
+    branch: Mapped[str | None] = mapped_column(String(200), default=None)
+    base_commit: Mapped[str | None] = mapped_column(String(64), default=None)
+    conversation_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    error: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+    assertion: Mapped[Assertion] = relationship(
+        "Assertion", back_populates="remediations"
     )
 
 

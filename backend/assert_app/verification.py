@@ -11,13 +11,34 @@ from sqlalchemy.orm import Session
 
 from . import agent_client, repos
 from .config import DATA_DIR, MAX_ITERATIONS
-from .models import Assertion, Evidence, Run
-from .prompts import TIDY_SYSTEM, build_investigation_prompt
+from .models import (
+    CATEGORIES,
+    DEFAULT_CATEGORY,
+    EFFORTS,
+    Assertion,
+    Evidence,
+    ProposedFix,
+    Remediation,
+    Run,
+)
+from .prompts import (
+    TIDY_SYSTEM,
+    build_investigation_prompt,
+    build_remediation_prompt,
+)
 
 log = logging.getLogger(__name__)
 
-VERDICTS = {"true", "false", "partly_true", "unverifiable"}
+VERDICTS = {
+    "true",
+    "partly_true",
+    "mostly_false",
+    "false",
+    "uncertain",
+    "unverifiable",
+}
 _MAX_TEXT = 20_000
+MAX_FIXES = 5
 
 
 def reports_dir() -> Path:
@@ -30,21 +51,83 @@ def report_path(run: Run) -> Path:
     return reports_dir() / f"run-{run.id}.json"
 
 
-def tidy(raw_text: str) -> str:
-    """Copy-edit an assertion. Falls back to the raw text if the LLM fails."""
+# The LLM occasionally prefixes the claim with a label despite being told not
+# to; strip it rather than surfacing it to the user.
+_LABEL_RE = re.compile(
+    r"^\s*(?:the\s+)?(?:rewritten|revised|edited|tidied|cleaned[- ]up|polished|"
+    r"corrected|updated|final)?\s*assertion\s*[:\-—]\s*",
+    re.IGNORECASE,
+)
+
+
+def _strip_label(text: str) -> str:
+    """Drop a leading 'Rewritten assertion:' style label and any wrapping quotes."""
+    out = _LABEL_RE.sub("", text.strip(), count=1).strip()
+    # Only unwrap quotes that enclose the whole thing, not an interior quotation.
+    for lq, rq in (('"', '"'), ("'", "'"), ("“", "”"), ("‘", "’")):
+        if len(out) >= 2 and out.startswith(lq) and out.endswith(rq):
+            inner = out[1:-1]
+            if lq not in inner and rq not in inner:
+                out = inner.strip()
+            break
+    return out
+
+
+def tidy(raw_text: str) -> dict:
+    """Copy-edit an assertion and classify it.
+
+    Returns ``{"text", "title", "emoji", "category"}``. Falls back to the raw
+    text with empty metadata if the LLM call or its JSON fails.
+    """
+    fallback = {
+        "text": _strip_label(raw_text),
+        "title": "",
+        "emoji": "",
+        "category": DEFAULT_CATEGORY,
+    }
     try:
         out = agent_client.chat(
             [
                 {"role": "system", "content": TIDY_SYSTEM},
                 {"role": "user", "content": raw_text},
             ],
-            max_tokens=400,
+            max_tokens=700,
         )
+        data = _parse_report(out)
     except Exception:
         log.exception("Tidy call failed; keeping raw text")
-        return raw_text.strip()
-    out = out.strip().strip("`").strip()
-    return out or raw_text.strip()
+        return fallback
+
+    if not isinstance(data, dict):
+        return fallback
+
+    text = _strip_label(str(data.get("text") or ""))
+    category = str(data.get("category") or "").strip().lower()
+    return {
+        "text": text or fallback["text"],
+        "title": str(data.get("title") or "").strip()[:80],
+        # Guard against the model returning a word instead of an emoji.
+        "emoji": str(data.get("emoji") or "").strip()[:8],
+        "category": category if category in CATEGORIES else DEFAULT_CATEGORY,
+    }
+
+
+def backfill_metadata(db: Session, assertion: Assertion) -> None:
+    """Give a pre-existing assertion a title/emoji/category.
+
+    Re-runs the tidy pass on the already-tidied text purely for its
+    classification, leaving the wording alone.
+    """
+    if assertion.title:
+        return
+    meta = tidy(assertion.text or assertion.raw_text)
+    assertion.title = meta["title"]
+    assertion.emoji = meta["emoji"]
+    assertion.category = meta["category"]
+    # The label strip is worth taking even on old rows.
+    if meta["text"]:
+        assertion.text = meta["text"]
+    db.commit()
 
 
 def start_run(db: Session, assertion: Assertion) -> Run:
@@ -115,9 +198,8 @@ def ingest_report(db: Session, run: Run) -> bool:
         return True
 
     verdict = str(data.get("verdict") or "").strip().lower()
-    run.verdict = verdict if verdict in VERDICTS else "unverifiable"
+    run.verdict = verdict if verdict in VERDICTS else "uncertain"
     run.summary = _clip(data.get("summary"))
-    run.suggested_text = _clip(data.get("suggested_assertion"))
     run.caveats = _clip(data.get("caveats"))
     run.status = "done"
     run.error = None
@@ -125,6 +207,30 @@ def ingest_report(db: Session, run: Run) -> bool:
 
     for old in list(run.evidence):
         db.delete(old)
+    for old in list(run.fixes):
+        db.delete(old)
+
+    if run.verdict != "true":
+        for i, item in enumerate((data.get("fixes") or [])[:MAX_FIXES]):
+            if not isinstance(item, dict):
+                continue
+            effort = str(item.get("effort") or "").strip().lower()
+            raw_conf = item.get("confidence")
+            db.add(
+                ProposedFix(
+                    run_id=run.id,
+                    position=i,
+                    title=_clip(item.get("title"))[:200],
+                    plan=_clip(item.get("plan")),
+                    effort=effort if effort in EFFORTS else "medium",
+                    confidence=(
+                        max(0, min(100, raw_conf))
+                        if isinstance(raw_conf, int)
+                        else None
+                    ),
+                    notes=_clip(item.get("notes")),
+                )
+            )
 
     slug = run.assertion.project.slug
     for i, item in enumerate(data.get("evidence") or []):
@@ -191,3 +297,140 @@ def sync_run(db: Session, run: Run) -> Run:
         db.commit()
         db.refresh(run)
     return run
+
+
+# --- remediation ------------------------------------------------------------
+
+
+def remediation_report_path(rem: Remediation) -> Path:
+    return reports_dir() / f"remediation-{rem.id}.json"
+
+
+def start_remediation(
+    db: Session, assertion: Assertion, fix: ProposedFix | None = None
+) -> Remediation:
+    """Dispatch an agent to apply ``fix`` on a scratch worktree.
+
+    Defaults to the run's first (best-rated) fix when none is named.
+    """
+    run = assertion.latest_run
+    if run is None or run.status != "done":
+        raise RuntimeError("Assertion has no finished run to remediate")
+    if run.verdict == "true":
+        raise RuntimeError("Assertion is already true")
+
+    if fix is None:
+        if not run.fixes:
+            raise RuntimeError("The latest run proposed no fixes")
+        fix = run.fixes[0]
+    elif fix.run_id != run.id:
+        raise RuntimeError("That fix belongs to an older run")
+
+    project = assertion.project
+    rem = Remediation(
+        assertion_id=assertion.id,
+        run_id=run.id,
+        fix_id=fix.id,
+        status="working",
+        base_commit=repos.head_sha(project.slug),
+    )
+    db.add(rem)
+    db.commit()
+    db.refresh(rem)
+
+    branch = f"assert/remediation-{rem.id}"
+    try:
+        worktree = repos.create_worktree(project.slug, branch)
+    except Exception as exc:
+        rem.status = "error"
+        rem.error = f"Could not create worktree: {exc}"
+        rem.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        raise
+
+    rem.branch = branch
+    db.commit()
+
+    prompt = build_remediation_prompt(
+        assertion_text=assertion.text or assertion.raw_text,
+        fix_title=fix.title,
+        remediation_plan=fix.plan,
+        checkout_dir=str(worktree),
+        branch=branch,
+        report_path=str(remediation_report_path(rem)),
+    )
+    try:
+        conv_id = agent_client.create_conversation(
+            assertion_id=assertion.id,
+            initial_message=prompt,
+            working_dir=str(worktree),
+            title=f"fix #{assertion.id}: {(fix.title or assertion.title)[:60]}",
+            max_iterations=MAX_ITERATIONS,
+        )
+    except Exception as exc:
+        rem.status = "error"
+        rem.error = f"Could not start agent: {exc}"
+        rem.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        raise
+
+    rem.conversation_id = conv_id
+    db.commit()
+    db.refresh(rem)
+    log.info("assertion %s → remediation %s → conv %s", assertion.id, rem.id, conv_id)
+    return rem
+
+
+def ingest_remediation(db: Session, rem: Remediation) -> bool:
+    """Load the remediation agent's report and capture its diff."""
+    path = remediation_report_path(rem)
+    if not path.exists():
+        return False
+
+    slug = rem.assertion.project.slug
+    try:
+        data = _parse_report(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        rem.status = "error"
+        rem.error = f"Agent report was not valid JSON: {exc}"
+        rem.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        return True
+
+    rem.summary = _clip(data.get("summary"))
+    rem.status = "error" if str(data.get("status")) == "blocked" else "done"
+    if rem.status == "error" and not rem.error:
+        rem.error = "Agent reported it was blocked."
+    rem.diff = _clip(
+        repos.worktree_diff(slug, rem.branch or "", rem.base_commit or "")
+    )
+    rem.finished_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(rem)
+    log.info("remediation %s ingested: %s", rem.id, rem.status)
+    return True
+
+
+def sync_remediation(db: Session, rem: Remediation) -> Remediation:
+    """Reconcile an in-flight remediation against its conversation's status."""
+    if rem.status != "working":
+        return rem
+    if ingest_remediation(db, rem):
+        return rem
+    if not rem.conversation_id:
+        return rem
+
+    try:
+        conv = agent_client.get_conversation(rem.conversation_id)
+    except Exception:
+        log.exception("Could not fetch conversation %s", rem.conversation_id)
+        return rem
+
+    status = (conv or {}).get("execution_status")
+    if status in {"finished", "error", "stuck", "paused"}:
+        rem.status = "error"
+        rem.error = f"Agent finished ({status}) without writing a report."
+        rem.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(rem)
+    return rem

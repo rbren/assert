@@ -23,15 +23,23 @@ export const api = {
   refreshProject: (id) => req(`/projects/${id}/refresh`, { method: 'POST' }),
   deleteProject: (id) => req(`/projects/${id}`, { method: 'DELETE' }),
 
-  createAssertion: (projectId, text) =>
+  createAssertion: (projectId, text, priority) =>
     req(`/projects/${projectId}/assertions`, {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, priority }),
     }),
   getAssertion: (id) => req(`/assertions/${id}`),
   listRuns: (id) => req(`/assertions/${id}/runs`),
-  updateAssertion: (id, text) =>
-    req(`/assertions/${id}`, { method: 'PATCH', body: JSON.stringify({ text }) }),
+  updateAssertion: (id, patch) =>
+    req(`/assertions/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   reverify: (id) => req(`/assertions/${id}/verify`, { method: 'POST' }),
   deleteAssertion: (id) => req(`/assertions/${id}`, { method: 'DELETE' }),
+
+  remediate: (id, fixId) =>
+    req(`/assertions/${id}/remediate`, {
+      method: 'POST',
+      body: JSON.stringify({ fix_id: fixId ?? null }),
+    }),
+  listRemediations: (id) => req(`/assertions/${id}/remediations`),
+  discardRemediation: (id) => req(`/remediations/${id}`, { method: 'DELETE' }),
 }

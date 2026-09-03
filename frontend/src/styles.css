@@ -8,7 +8,9 @@
   --accent: #6ea8fe;
   --true: #4ade80;
   --false: #f87171;
+  --mostly-false: #fb923c;
   --partly: #fbbf24;
+  --uncertain: #94a3b8;
   --unverifiable: #a78bfa;
   --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
@@ -172,22 +174,305 @@ a.card:hover {
 .badge.true {
   color: var(--true);
 }
-.badge.false {
+.badge.false,
+.badge.error {
   color: var(--false);
+}
+.badge.mostly_false {
+  color: var(--mostly-false);
 }
 .badge.partly_true {
   color: var(--partly);
 }
+.badge.uncertain {
+  color: var(--uncertain);
+}
 .badge.unverifiable {
   color: var(--unverifiable);
 }
-.badge.pending {
+.badge.pending,
+.badge.queued {
   color: var(--muted);
+}
+.badge.priority-high {
+  color: var(--false);
+}
+.badge.priority-medium {
+  color: var(--partly);
+}
+.badge.priority-low {
+  color: var(--muted);
+}
+
+.chip {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.chip.fresh {
+  color: var(--true);
+}
+.chip.stale {
+  color: var(--partly);
+}
+.chip.effort-easy {
+  color: var(--true);
+}
+.chip.effort-medium {
+  color: var(--partly);
+}
+.chip.effort-hard {
+  color: var(--false);
 }
 
 .assertion-text {
   font-size: 16px;
   margin: 0 0 8px;
+}
+
+/* ── Assertion table ─────────────────────────────────────────────── */
+
+table.assertions {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+table.assertions th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+table.assertions td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+table.assertions tr:hover td {
+  background: var(--panel);
+}
+.cell-title {
+  width: 45%;
+}
+.cell-title a {
+  color: var(--text);
+  font-weight: 500;
+}
+.row-emoji {
+  margin-right: 6px;
+}
+.row-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+.cell-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+button.icon {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 5px 8px;
+  margin-left: 4px;
+}
+button.icon:hover:not(:disabled) {
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
+button.icon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.filters select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+/* ── Markdown ────────────────────────────────────────────────────── */
+
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p {
+  margin: 0 0 10px;
+}
+.md ul,
+.md ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.md li {
+  margin-bottom: 3px;
+}
+.md code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.md pre {
+  overflow-x: auto;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+}
+.md a {
+  color: var(--accent);
+}
+
+.assertion-heading {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+}
+.assertion-body {
+  font-size: 16px;
+  margin: 14px 0;
+}
+.as-typed {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+/* ── Edit form ───────────────────────────────────────────────────── */
+
+.edit-form {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--panel);
+}
+.edit-form input,
+.edit-form select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 14px;
+}
+.edit-form input:not(.emoji-input) {
+  flex: 1;
+}
+.edit-form .emoji-input {
+  width: 56px;
+  text-align: center;
+}
+.edit-form textarea {
+  margin: 10px 0;
+}
+
+/* ── Fixes & remediation ─────────────────────────────────────────── */
+
+.fix {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.fix-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--panel-2);
+}
+.fix-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+}
+.fix-title {
+  font-weight: 500;
+}
+.fix-body {
+  padding: 12px;
+}
+.fix-notes {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.caret {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.remediation {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 16px 0;
+  background: var(--panel);
+}
+.remediation-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.remediation-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.diff summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+.diff pre {
+  max-height: 420px;
+  overflow: auto;
+}
+button.danger-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: underline;
+}
+button.danger-link:hover {
+  color: var(--false);
 }
 
 .evidence {
@@ -197,19 +482,35 @@ a.card:hover {
   overflow: hidden;
 }
 .evidence-head {
+  width: 100%;
   background: var(--panel-2);
   padding: 9px 12px;
-  border-bottom: 1px solid var(--border);
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
+.evidence-head:hover {
+  background: var(--border);
+}
 .evidence-caption {
-  padding: 10px 12px;
-  font-size: 13.5px;
+  flex: 1;
+}
+.evidence-body {
+  border-top: 1px solid var(--border);
+}
+.evidence-ref {
+  padding: 8px 12px;
+  font-size: 12.5px;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  white-space: pre;
 }
 pre {
   margin: 0;

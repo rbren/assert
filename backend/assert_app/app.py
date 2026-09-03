@@ -12,23 +12,26 @@ from sqlalchemy import select
 from . import verification
 from .config import CORS_ORIGINS, POLL_INTERVAL_SECONDS
 from .db import engine, session_scope
-from .models import Base, Run
+from .models import Base, Remediation, Run
 from .routes import router
 
 log = logging.getLogger(__name__)
 
 
 async def _poll_runs() -> None:
-    """Ingest finished runs even when no client is watching."""
+    """Ingest finished work even when no client is watching."""
     while True:
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
         try:
             with session_scope() as db:
-                in_flight = db.scalars(
+                for run in db.scalars(
                     select(Run).where(Run.status == "investigating")
-                ).all()
-                for run in in_flight:
+                ).all():
                     verification.sync_run(db, run)
+                for rem in db.scalars(
+                    select(Remediation).where(Remediation.status == "working")
+                ).all():
+                    verification.sync_remediation(db, rem)
         except Exception:
             log.exception("Run poller iteration failed")
 

@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
 
-async function req(path, options = {}) {
+/* The app reaches its backend two ways. Served from its own domain it calls
+ * /api on the same origin; mounted as an Agent Canvas extension it has no
+ * origin of its own and goes through the host's authenticated request adapter.
+ * Everything below is written against `transport`, which the Canvas entrypoint
+ * swaps out at activation. */
+export async function fetchTransport(path, { method = 'GET', body } = {}) {
   const res = await fetch(`/api${path}`, {
+    method,
     headers: { 'Content-Type': 'application/json' },
-    ...options,
+    body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!res.ok) {
     let detail = res.statusText
@@ -17,10 +23,20 @@ async function req(path, options = {}) {
   return res.status === 204 ? null : res.json()
 }
 
+let transport = fetchTransport
+
+export function setApiTransport(next) {
+  transport = next || fetchTransport
+  // The canvas URL below is read once per transport: a different transport is
+  // a different backend, so the cached answer no longer applies.
+  canvasUrlPromise = null
+}
+
+const req = (path, options) => transport(path, options)
+
 export const api = {
   listProjects: () => req('/projects'),
-  createProject: (repoUrl) =>
-    req('/projects', { method: 'POST', body: JSON.stringify({ repo_url: repoUrl }) }),
+  createProject: (repoUrl) => req('/projects', { method: 'POST', body: { repo_url: repoUrl } }),
   getProject: (id) => req(`/projects/${id}`),
   refreshProject: (id) => req(`/projects/${id}/refresh`, { method: 'POST' }),
   deleteProject: (id) => req(`/projects/${id}`, { method: 'DELETE' }),
@@ -28,19 +44,18 @@ export const api = {
   createAssertion: (projectId, text, priority) =>
     req(`/projects/${projectId}/assertions`, {
       method: 'POST',
-      body: JSON.stringify({ text, priority }),
+      body: { text, priority },
     }),
   getAssertion: (id) => req(`/assertions/${id}`),
   listRuns: (id) => req(`/assertions/${id}/runs`),
-  updateAssertion: (id, patch) =>
-    req(`/assertions/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  updateAssertion: (id, patch) => req(`/assertions/${id}`, { method: 'PATCH', body: patch }),
   reverify: (id) => req(`/assertions/${id}/verify`, { method: 'POST' }),
   deleteAssertion: (id) => req(`/assertions/${id}`, { method: 'DELETE' }),
 
   remediate: (id, fixId) =>
     req(`/assertions/${id}/remediate`, {
       method: 'POST',
-      body: JSON.stringify({ fix_id: fixId ?? null }),
+      body: { fix_id: fixId ?? null },
     }),
   listRemediations: (id) => req(`/assertions/${id}/remediations`),
   discardRemediation: (id) => req(`/remediations/${id}`, { method: 'DELETE' }),

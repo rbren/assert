@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "name": "assert",
+  "display_name": "Assert",
+  "version": "0.1.0",
+  "description": "Make a claim about a codebase. An agent checks it and hands back a verdict backed by evidence you can reproduce at a commit.",
+  "entrypoint": "extension.js",
+  "contributes": {
+    "pages": [
+      {
+        "id": "claims",
+        "title": "Assert",
+        "path": "/claims",
+        "nav_label": "Assert",
+        "description": "Claims about your repositories, checked by an agent."
+      }
+    ]
+  }
+}

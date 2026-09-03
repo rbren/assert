@@ -3,7 +3,10 @@
 Make a claim about a codebase. An agent goes and checks it, then hands back a
 verdict backed by evidence you can reproduce at a specific commit.
 
-Live at <https://assert.apps.canvas.rbren.io> (basic auth).
+Live at <https://assert.apps.canvas.rbren.io> (basic auth), and as an Agent
+Canvas extension at
+<https://canvas.rbren.io/extensions/assert/claims> — the same app, the same
+backend, mounted as a page inside Canvas.
 
 ## How it works
 
@@ -41,6 +44,7 @@ restated with whatever nuance it discovered folded in — plus separate
 ## Layout
 
 ```
+extensions/assert/     the Agent Canvas extension package (manifest + bundle)
 backend/assert_app/    FastAPI + SQLAlchemy (SQLite)
   config.py            paths, ports, model ids
   models.py            Project → Assertion → Run → Evidence
@@ -51,10 +55,20 @@ backend/assert_app/    FastAPI + SQLAlchemy (SQLite)
   routes.py            REST API under /api
   app.py               app factory + background poller for in-flight runs
 frontend/src/          React (Vite), react-router
+  routes.jsx           the route table, shared by both shells
+  canvas/              the Canvas extension: activation, host router, styles
+frontend/build-extension.mjs
+                       bundles the app into extensions/assert/extension.js
 nginx/                 deployed site config
 systemd/               assert-backend.service
 data/                  SQLite db, checkouts, agent reports (gitignored)
 ```
+
+The app ships two ways from one source tree: a standalone site on its own
+domain, and a Canvas extension page. Only the shell differs — the router is
+driven by the Canvas host, and API calls go through the host's authenticated
+request adapter to `/api/assert/`, which the Canvas host proxies to this same
+backend. See `extensions/assert/README.md`.
 
 ## Running locally
 
@@ -76,3 +90,7 @@ The backend runs as `assert-backend.service` on `127.0.0.1:18400`; nginx serves
 cd frontend && npm run build          # nginx serves dist/ directly
 systemctl restart assert-backend      # after backend changes
 ```
+
+`npm run build` also rebuilds `extensions/assert/extension.js`. The agent
+server installs a Canvas extension by *copying* the package, so a rebuilt
+bundle reaches Canvas only after a forced reinstall — see `AGENTS.md`.

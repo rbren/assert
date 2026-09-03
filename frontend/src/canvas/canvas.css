@@ -1,0 +1,12 @@
+/* Extension-only rules, written already scoped: the app stylesheet is scoped
+   under .assert-ext by build-extension.mjs, this file bypasses that pass. */
+
+.assert-ext {
+  min-height: 100%;
+}
+
+/* The standalone app hangs this off main.wrap; inside Canvas the body of the
+   page is a <div>, because Canvas owns the document's one <main>. */
+.assert-ext > div.wrap {
+  padding-bottom: 120px;
+}

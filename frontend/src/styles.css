@@ -782,10 +782,81 @@ details.suggestions button:hover:not(:disabled) {
 .ledger {
   border-top: 1px solid var(--rule-strong);
 }
+/* Claim | category | severity | status as fixed columns, so every value lines
+   up under the header that sorts and filters it. */
+.ledger-head,
 .claim-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 232px 150px;
-  gap: 20px;
+  grid-template-columns: 30px minmax(0, 1fr) 128px 100px 124px 146px;
+  gap: 18px;
+}
+.ledger-head {
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.col-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.col-head button {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  border: 0;
+  padding: 5px 3px;
+}
+.col-head button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+}
+.col-head.sorted .col-sort,
+.col-head.filtered .col-filter {
+  color: var(--ink);
+}
+.col-arrow {
+  margin-left: 6px;
+  color: var(--ink-3);
+  opacity: 0.5;
+}
+.col-head.sorted .col-arrow {
+  color: var(--ink);
+  opacity: 1;
+}
+.col-menu {
+  position: absolute;
+  top: 100%;
+  left: -5px;
+  z-index: 20;
+  min-width: 172px;
+  display: flex;
+  flex-direction: column;
+  background: var(--raised);
+  border: 1px solid var(--rule-strong);
+  padding: 4px;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
+}
+.col-menu button {
+  color: var(--ink-2);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+.col-menu button:hover:not(:disabled) {
+  background: var(--sunk);
+  color: var(--ink);
+}
+.col-menu button.on {
+  color: var(--ink);
+}
+.col-menu button.on::after {
+  content: ' ✓';
+  color: var(--ink-2);
+}
+.claim-row {
   align-items: start;
   padding: 20px 0;
   border-bottom: 1px solid var(--rule);
@@ -821,17 +892,11 @@ details.suggestions button:hover:not(:disabled) {
   margin-top: 9px;
   flex-wrap: wrap;
 }
-/* Priority | standing as two fixed columns, so the words line up row to row
-   like a table. */
-.claim-standing {
-  padding-top: 2px;
-  display: grid;
-  grid-template-columns: 112px auto;
-  gap: 10px;
-  align-items: center;
+.claim-cell {
+  padding-top: 3px;
 }
-.claim-standing .chip {
-  text-align: center;
+.claim-cell .chip {
+  display: block;
 }
 .claim-actions {
   display: flex;
@@ -1428,13 +1493,32 @@ details.diff pre {
     grid-column: 1 / -1;
     order: 3;
   }
+  /* No columns to head, so the header becomes a plain bar of the same sort
+     and filter controls. */
+  .ledger-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 12px;
+  }
+  .ledger-head > span {
+    display: none;
+  }
   .claim-row {
     grid-template-columns: 26px minmax(0, 1fr);
-    gap: 14px;
+    gap: 8px 14px;
   }
-  .claim-standing,
+  .claim-cell,
   .claim-actions {
     grid-column: 2;
+  }
+  .claim-cell {
+    padding-top: 0;
+  }
+  .claim-cell .chip {
+    display: inline-block;
+  }
+  .claim-actions {
+    margin-top: 6px;
   }
   .claim-actions {
     opacity: 1;

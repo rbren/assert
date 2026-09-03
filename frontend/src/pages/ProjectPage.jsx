@@ -8,6 +8,7 @@ import {
   Chip,
   Freshness,
   Inline,
+  ORDER,
   PRIORITIES,
   STANDING,
   Standing,
@@ -28,15 +29,112 @@ const SUGGESTIONS = [
   'AGENTS.md exists, conforms to best practices, and is up to date',
 ]
 
-const SORTS = {
-  standing: { label: 'Standing', key: statusRank },
-  priority: { label: 'Priority', key: priorityRank },
-  staleness: {
-    label: 'Staleness',
-    key: (a) => -(a.latest_run?.commits_behind ?? -1),
-  },
-  category: { label: 'Category', key: (a) => a.category || '' },
-  newest: { label: 'Newest', key: (a) => -a.id },
+/* The table's columns. Each one is its own sort, and the three data columns
+ * are their own filter too — the header is the only control there is. */
+export const COLUMNS = {
+  claim: { label: 'Claim', key: (a) => -a.id },
+  category: { label: 'Category', key: (a) => a.category || '', value: (a) => a.category },
+  severity: { label: 'Severity', key: priorityRank, value: (a) => a.priority },
+  status: { label: 'Status', key: statusRank, value: statusOf },
+}
+
+export const NO_FILTERS = { category: null, severity: null, status: null }
+
+export function arrangeClaims(assertions, sort, filters) {
+  const rows = assertions.filter((a) =>
+    Object.entries(filters).every(([col, want]) => !want || COLUMNS[col].value(a) === want),
+  )
+  const keyOf = COLUMNS[sort.col].key
+  const flip = sort.dir === 'desc' ? -1 : 1
+  // Status, then severity, break every other tie — so sorting by status leads
+  // each verdict group with its highest-severity claims.
+  return rows.sort((x, y) => {
+    const kx = keyOf(x)
+    const ky = keyOf(y)
+    if (kx < ky) return -flip
+    if (kx > ky) return flip
+    return statusRank(x) - statusRank(y) || priorityRank(x) - priorityRank(y) || y.id - x.id
+  })
+}
+
+/** A header cell: click the word to sort by it, the caret to filter on it. */
+function ColumnHead({ col, sort, onSort, options, filter, onFilter, allLabel }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef(null)
+  const { label } = COLUMNS[col]
+  const sorted = sort.col === col
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e) => {
+      if (!box.current?.contains(e.target)) setOpen(false)
+    }
+    const esc = (e) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  return (
+    <div
+      className={`col-head ${sorted ? 'sorted' : ''} ${filter ? 'filtered' : ''}`}
+      ref={box}
+    >
+      <button
+        className="col-sort"
+        onClick={() => onSort(col)}
+        aria-sort={sorted ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+        title={`Sort by ${label.toLowerCase()}`}
+      >
+        {label}
+        <span className="col-arrow" aria-hidden="true">
+          {sorted ? (sort.dir === 'asc' ? '↑' : '↓') : '↕'}
+        </span>
+      </button>
+      {options && (
+        <>
+          <button
+            className="col-filter"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            title={`Filter by ${label.toLowerCase()}`}
+          >
+            ▾
+          </button>
+          {open && (
+            <div className="col-menu">
+              <button
+                className={filter ? '' : 'on'}
+                onClick={() => {
+                  onFilter(null)
+                  setOpen(false)
+                }}
+              >
+                {allLabel}
+              </button>
+              {options.map((o) => (
+                <button
+                  key={o.value}
+                  className={filter === o.value ? 'on' : ''}
+                  onClick={() => {
+                    onFilter(o.value)
+                    setOpen(false)
+                  }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 function ClaimRow({ a, onRecheck, onFix, busy }) {
@@ -57,7 +155,6 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
           </div>
         </Link>
         <div className="claim-tags">
-          <Chip>{a.category}</Chip>
           <Freshness run={run} />
           {fixing && (
             <Chip>
@@ -76,8 +173,13 @@ function ClaimRow({ a, onRecheck, onFix, busy }) {
           )}
         </div>
       </div>
-      <div className="claim-standing">
+      <div className="claim-cell">
+        <Chip>{a.category}</Chip>
+      </div>
+      <div className="claim-cell">
         <Chip className={a.priority}>{a.priority}</Chip>
+      </div>
+      <div className="claim-cell">
         <Standing status={status} />
       </div>
       <div className="claim-actions">
@@ -106,10 +208,8 @@ export default function ProjectPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const [sortBy, setSortBy] = useState('standing')
-  const [standingFilter, setStandingFilter] = useState(null)
-  const [categoryFilter, setCategoryFilter] = useState('all')
-  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [sort, setSort] = useState({ col: 'status', dir: 'asc' })
+  const [filters, setFilters] = useState(NO_FILTERS)
 
   const navigate = useNavigate()
   const timer = useRef(null)
@@ -141,29 +241,21 @@ export default function ProjectPage() {
 
   const counts = useMemo(() => tally(project?.assertions || []), [project])
 
-  const visible = useMemo(() => {
-    if (!project) return []
-    const rows = project.assertions.filter(
-      (a) =>
-        (!standingFilter || statusOf(a) === standingFilter) &&
-        (categoryFilter === 'all' || a.category === categoryFilter) &&
-        (priorityFilter === 'all' || a.priority === priorityFilter),
-    )
-    const keyOf = SORTS[sortBy].key
-    // Standing, then priority, break every other tie — so sorting by standing
-    // leads each verdict group with its highest-priority claims.
-    return [...rows].sort((x, y) => {
-      const kx = keyOf(x)
-      const ky = keyOf(y)
-      if (kx < ky) return -1
-      if (kx > ky) return 1
-      return (
-        statusRank(x) - statusRank(y) ||
-        priorityRank(x) - priorityRank(y) ||
-        y.id - x.id
-      )
-    })
-  }, [project, sortBy, standingFilter, categoryFilter, priorityFilter])
+  const visible = useMemo(
+    () => (project ? arrangeClaims(project.assertions, sort, filters) : []),
+    [project, sort, filters],
+  )
+
+  const setFilter = useCallback(
+    (col, value) => setFilters((f) => ({ ...f, [col]: value })),
+    [],
+  )
+
+  const toggleSort = useCallback(
+    (col) =>
+      setSort((s) => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' })),
+    [],
+  )
 
   async function submit(e) {
     e.preventDefault()
@@ -240,17 +332,17 @@ export default function ProjectPage() {
         <section className="standing-panel">
           <div className="row spread wrap-row" style={{ marginBottom: 12 }}>
             <span className="label">Where {total} claim{total === 1 ? '' : 's'} stand</span>
-            {standingFilter && (
-              <button className="link" onClick={() => setStandingFilter(null)}>
-                Clear the {STANDING[standingFilter].name.toLowerCase()} filter
+            {filters.status && (
+              <button className="link" onClick={() => setFilter('status', null)}>
+                Clear the {STANDING[filters.status].name.toLowerCase()} filter
               </button>
             )}
           </div>
           <StandingAxis
             counts={counts}
             total={total}
-            selected={standingFilter}
-            onSelect={setStandingFilter}
+            selected={filters.status}
+            onSelect={(k) => setFilter('status', k)}
           />
           <AxisLegend counts={counts} />
         </section>
@@ -318,31 +410,11 @@ export default function ProjectPage() {
         <span className="toolbar-count">
           {filtered ? `${visible.length} of ${total} claims` : `${total} claim${total === 1 ? '' : 's'}`}
         </span>
-        <div className="row wrap-row">
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="all">Every category</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
-            <option value="all">Every priority</option>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p} priority
-              </option>
-            ))}
-          </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            {Object.entries(SORTS).map(([k, v]) => (
-              <option key={k} value={k}>
-                Sort by {v.label.toLowerCase()}
-              </option>
-            ))}
-          </select>
-        </div>
+        {filtered && (
+          <button className="link" onClick={() => setFilters(NO_FILTERS)}>
+            Clear every filter
+          </button>
+        )}
       </div>
 
       {total === 0 ? (
@@ -350,19 +422,56 @@ export default function ProjectPage() {
           No claims yet. Write what you believe is true about this repository and an
           agent will go and check it.
         </p>
-      ) : visible.length === 0 ? (
-        <p className="empty">Nothing matches these filters.</p>
       ) : (
         <div className="ledger">
-          {visible.map((a) => (
-            <ClaimRow
-              key={a.id}
-              a={a}
-              busy={busy}
-              onRecheck={(id) => act(() => api.reverify(id))}
-              onFix={(id) => act(() => api.remediate(id))}
+          <div className="ledger-head">
+            <span />
+            <ColumnHead col="claim" sort={sort} onSort={toggleSort} />
+            <ColumnHead
+              col="category"
+              sort={sort}
+              onSort={toggleSort}
+              filter={filters.category}
+              onFilter={(v) => setFilter('category', v)}
+              allLabel="Every category"
+              options={CATEGORIES.map((c) => ({ value: c, label: c }))}
             />
-          ))}
+            <ColumnHead
+              col="severity"
+              sort={sort}
+              onSort={toggleSort}
+              filter={filters.severity}
+              onFilter={(v) => setFilter('severity', v)}
+              allLabel="Every severity"
+              options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+            />
+            <ColumnHead
+              col="status"
+              sort={sort}
+              onSort={toggleSort}
+              filter={filters.status}
+              onFilter={(v) => setFilter('status', v)}
+              allLabel="Every status"
+              options={ORDER.filter((k) => counts[k]).map((k) => ({
+                value: k,
+                label: `${STANDING[k].name.toLowerCase()} (${counts[k]})`,
+              }))}
+            />
+            <span />
+          </div>
+          {visible.length === 0 ? (
+            <p className="empty">Nothing matches these filters.</p>
+          ) : (
+            visible.map((a) => (
+              <ClaimRow
+                key={a.id}
+                a={a}
+                busy={busy}
+                onRecheck={(id) => act(() => api.reverify(id))}
+                onFix={(id) => act(() => api.remediate(id))}
+              />
+            ))
+          )}
         </div>
       )}
     </>

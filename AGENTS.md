@@ -47,6 +47,11 @@ Both LLM paths go through the local agent-server at `127.0.0.1:18000`:
   "Refuted" label is now "False").
 - The `Standing` component renders the verdict word alone; the distribution
   across a set of claims is the separate `StandingAxis`.
+- The claim table is header-driven: its columns (claim, category, severity,
+  status) each sort on click and the three data columns filter from their own
+  header menu. There are no standalone filter/sort dropdowns — add a column,
+  not a control. The pure sort/filter is `arrangeClaims` in `ProjectPage.jsx`,
+  tested in `ProjectPage.test.js`.
 - Exhibit stance (`for`/`against`) deliberately borrows no colour from the
   verdict ramp — it is told by its sign and weight, since an exhibit's side is
   not the run's verdict. Runs ingested before stances exist carry `""` and

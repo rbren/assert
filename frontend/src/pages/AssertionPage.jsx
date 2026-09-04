@@ -228,10 +228,6 @@ export default function AssertionPage() {
           onCommit={(text) => act(() => api.updateAssertion(assertion.id, { text }))}
         />
 
-        {assertion.raw_text !== assertion.text && (
-          <p className="as-typed">As you typed it: “{assertion.raw_text}”</p>
-        )}
-
         <div className="row wrap-row claim-meta">
           <select
             className="chip-select"

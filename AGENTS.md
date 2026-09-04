@@ -86,6 +86,13 @@ Both LLM paths go through the local agent-server at `127.0.0.1:18000`:
   verdict ramp — it is told by its sign and weight, since an exhibit's side is
   not the run's verdict. Runs ingested before stances exist carry `""` and
   render no marker.
+- Canonical SPA URLs are `/projects/$org/$repo` for a repository and
+  `/projects/$org/$repo/assertions/$slug` for an assertion. Assertion titles
+  are DNS-style slugs; a just-created pending assertion temporarily uses
+  `assertion-<id>` until its title is available. Nginx's SPA fallback supports
+  direct navigation.
+- Assertion text is prose: the composer uses a textarea, list rows show only
+  the title, and the full text belongs on the assertion page.
 
 ## Gotchas
 

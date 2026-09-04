@@ -49,8 +49,8 @@ function ClaimEditor({ value, busy, onCommit }) {
         ref={ref}
         className="claim-field"
         value={draft}
-        rows={1}
-        aria-label="Claim"
+        rows={3}
+        aria-label="Assertion text"
         spellCheck="false"
         disabled={busy}
         onChange={(e) => setDraft(e.target.value)}

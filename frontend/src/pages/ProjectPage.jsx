@@ -7,7 +7,6 @@ import {
   CATEGORIES,
   Chip,
   Freshness,
-  Inline,
   ORDER,
   PRIORITIES,
   STANDING,
@@ -172,10 +171,7 @@ function ClaimRow({ a, project, onRecheck, onFix, busy }) {
       </div>
       <div>
         <Link to={assertionPath(project, a)}>
-          {a.title && <div className="claim-title">{a.title}</div>}
-          <div className="claim-text">
-            <Inline>{a.text}</Inline>
-          </div>
+          <div className="claim-title">{a.title || 'Untitled claim'}</div>
         </Link>
         <div className="claim-tags">
           <Freshness run={run} />

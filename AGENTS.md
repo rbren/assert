@@ -85,6 +85,10 @@ Both LLM paths go through the local agent-server at `127.0.0.1:18000`:
   `api`, whose transport the Canvas entrypoint swaps for the host's
   authenticated request adapter. Anything the extension needs that the site
   does not belongs in `src/canvas/`, not in a branch inside a page.
+- Dark theming is shared through `frontend/src/styles.css` for both standalone and
+  Canvas shells. Keep native controls on `color-scheme: dark`, preserve WCAG AA
+  contrast, and retain the Canvas bundle regression in
+  `src/canvas/extension.test.jsx` when changing theme tokens.
 - Verdicts: internal status values (`false`, CSS `n-false`/`s-false`) stay
   lowercase code identifiers; only the user-facing labels change (e.g. the old
   "Refuted" label is now "False").

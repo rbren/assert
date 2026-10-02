@@ -31,6 +31,8 @@ Error generating stack: `+o.message+`
  *      Nothing decorative borrows it. */
 
 .assert-ext {
+  color-scheme: dark;
+
   /* Dark ground. Not black: a cool slate that keeps the mineral cast of the
      palette, so the verdict hues sit in the same family as the surface rather
      than floating on a neutral void. Elevation reads as *more* light, so
@@ -40,7 +42,7 @@ Error generating stack: `+o.message+`
   --sunk: #101314;
   --ink: #e8eae6;
   --ink-2: #a4aca8;
-  --ink-3: #757e7b;
+  --ink-3: #7d8683;
   --rule: #333a3b;
   --rule-soft: #262c2e;
   /* Structural dividers \u2014 the ones that ran full-bleed in near-black on paper.
@@ -53,7 +55,7 @@ Error generating stack: `+o.message+`
      on a dark ground \u2014 it recedes exactly where the design needs it to carry
      meaning. Each hue is lifted in lightness and eased off in saturation so it
      stays luminous against --paper while keeping its identity and its order. */
-  --refuted: #d4525c;
+  --refuted: #d85a63;
   --mostly-false: #e07a52;
   --partly: #d69a2c;
   --holds: #3fae86;
@@ -67,8 +69,8 @@ Error generating stack: `+o.message+`
 
   /* Priority \u2014 red / yellow / blue for high / medium / low. Own tokens, not
      aliases of the verdict ramp, so the two scales can drift independently. */
-  --pri-high: #d4525c;
-  --pri-high-wash: rgba(212, 82, 92, 0.1);
+  --pri-high: #d85a63;
+  --pri-high-wash: rgba(216, 90, 99, 0.1);
   --pri-medium: #d69a2c;
   --pri-low: #5aa6e8;
 
@@ -78,7 +80,7 @@ Error generating stack: `+o.message+`
      ago must not wear the same green as a claim that holds. Separate tokens
      keep the two questions from drifting into each other later. */
   --drifting: #c9922f;
-  --stale: #cf5350;
+  --stale: #d65b58;
 
   --display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
   --claim: 'Newsreader', ui-serif, Georgia, serif;

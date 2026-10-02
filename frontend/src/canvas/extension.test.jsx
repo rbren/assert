@@ -223,8 +223,9 @@ describe('the built bundle', () => {
     }
   })
 
-  it('carries the stylesheet and its scope, and no backend secrets', () => {
+  it('carries the dark stylesheet and its scope, and no backend secrets', () => {
     expect(bundle).toContain('.assert-ext')
+    expect(bundle).toMatch(/color-scheme:\s*dark/)
     expect(bundle).not.toMatch(/X-Session-API-Key|htpasswd|127\.0\.0\.1:18400/)
   })
 })

@@ -5,11 +5,12 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
-from . import verification
+from . import agent_client, verification
 from .config import CANVAS_URL, CORS_ORIGINS, POLL_INTERVAL_SECONDS
 from .db import engine, session_scope
 from .models import Base, Remediation, Run
@@ -66,6 +67,13 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(router, prefix="/api")
+
+    @app.exception_handler(agent_client.AgentServerError)
+    async def agent_unavailable(
+        _: Request, exc: agent_client.AgentServerError
+    ) -> JSONResponse:
+        log.warning("Agent service failure: %s", exc)
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     @app.get("/api/health")
     def health() -> dict:

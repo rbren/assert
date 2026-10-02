@@ -45,7 +45,24 @@ is built/restarted on this host:
   `/etc/nginx/snippets/assert-api.conf`, included from the canvas.rbren.io
   server block and mirrored in `nginx/canvas-assert-api.conf`.
 - Secrets: `/etc/assert/env` holds `OH_SESSION_API_KEYS_0`, the agent-server
-  session key. Not in git.
+  session key. Not in git. This is a copy: after agent-server key rotation,
+  refresh it securely and restart the backend. Environment keys take precedence
+  over fallback key files, which can also be stale. Diagnose with the HTTP status
+  of authenticated `GET /api/settings`; never print keys or the settings body.
+- Worktree deployment: inspect `systemctl show assert-backend` for overrides.
+  To serve a dedicated worktree without editing the main checkout, set both
+  `WorkingDirectory` and uvicorn's `--app-dir` to its `backend` directory in a
+  systemd drop-in, retain `/etc/assert/env`, and explicitly keep
+  `ASSERT_DATA_ROOT=/root/git/assert/data`. Reload systemd before restarting.
+  Keep the deployed worktree available while the service references it.
+
+## Backend tests
+
+Run `PYTHONPATH=backend <backend-venv>/bin/python -m unittest discover -s backend
+-p 'test_*.py' -v` from the repository root. Tests use temporary SQLite databases,
+real git checkouts and a loopback HTTP fixture; they do not need live credentials
+or dispatch live agents. The existing host venv can be used read-only from a
+worktree with `PYTHONDONTWRITEBYTECODE=1`.
 
 ## Agent-server integration
 

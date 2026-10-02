@@ -6,10 +6,13 @@ Two things live here:
   - ``create_conversation()`` / ``get_conversation()``: the investigating
     agent, tagged ``assert=assertion-<id>``.
 """
+
 from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +29,10 @@ _KEY_FILES = (
 )
 
 
+class AgentServerError(Exception):
+    """An upstream service failure with a message safe to expose to clients."""
+
+
 def _load_session_key() -> str:
     for env in ("OH_SESSION_API_KEYS_0", "SESSION_API_KEY", "ASSERT_SESSION_KEY"):
         v = os.environ.get(env)
@@ -34,19 +41,34 @@ def _load_session_key() -> str:
     for p in _KEY_FILES:
         if p.exists():
             return p.read_text().strip()
-    raise RuntimeError(
-        "No agent-server session API key found (checked env "
-        "OH_SESSION_API_KEYS_0 / SESSION_API_KEY / ASSERT_SESSION_KEY and "
-        f"files {[str(p) for p in _KEY_FILES]})"
+    raise AgentServerError(
+        "Agent service credentials are not configured. Contact the administrator."
     )
 
 
-def _client(timeout: float = 60.0) -> httpx.Client:
-    return httpx.Client(
-        base_url=AGENT_SERVER_URL,
-        headers={"X-Session-API-Key": _load_session_key()},
-        timeout=timeout,
-    )
+@contextmanager
+def _client(timeout: float = 60.0) -> Iterator[httpx.Client]:
+    try:
+        with httpx.Client(
+            base_url=AGENT_SERVER_URL,
+            headers={"X-Session-API-Key": _load_session_key()},
+            timeout=timeout,
+        ) as client:
+            yield client
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status in (401, 403):
+            message = (
+                "Agent service authentication failed. Contact the administrator "
+                "to refresh the backend's session credential."
+            )
+        else:
+            message = f"Agent service request failed (HTTP {status}). Try again later."
+        raise AgentServerError(message) from exc
+    except httpx.RequestError as exc:
+        raise AgentServerError(
+            "Agent service is unavailable. Try again later."
+        ) from exc
 
 
 def chat(messages: list[dict[str, str]], *, max_tokens: int = 600) -> str:
@@ -88,9 +110,9 @@ def _agent_config() -> dict[str, Any]:
         settings = r.json()
     agent_settings = settings.get("agent_settings")
     if not agent_settings or not (agent_settings.get("llm") or {}).get("api_key"):
-        raise RuntimeError(
-            "Agent-server /api/settings returned no encrypted LLM api_key; "
-            "configure a default agent profile first."
+        raise AgentServerError(
+            "Agent service has no configured default agent profile. "
+            "Contact the administrator."
         )
     agent_settings = {k: v for k, v in agent_settings.items() if k != "schema_version"}
     agent_settings["tools"] = list(TOOLS)
